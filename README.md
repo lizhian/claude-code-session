@@ -1,5 +1,7 @@
 # Claude Code Session Picker
 
+[中文](README.zh-CN.md) | English
+
 Interactive Claude Code session picker for the current directory and existing Claude Code workspaces.
 
 ## Features
