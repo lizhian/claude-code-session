@@ -29,10 +29,13 @@ test("stores default config under the install directory", () => {
 });
 
 test("encodes absolute paths the way Claude Code stores project directories", () => {
-  assert.equal(encodeProjectPath("/Users/lizhian/临时"), "-Users-lizhian---");
+  const root = path.parse(process.cwd()).root;
+  const encodedRoot = root.replace(/[^A-Za-z0-9._-]/g, "-");
+
+  assert.equal(encodeProjectPath(path.join(root, "tmp", "临时")), `${encodedRoot}tmp---`);
   assert.equal(
-    encodeProjectPath("/Users/lizhian/Documents/Codex/2026-04-29/claude-code-session"),
-    "-Users-lizhian-Documents-Codex-2026-04-29-claude-code-session",
+    encodeProjectPath(path.join(root, "workspace", "2026-04-29", "claude-code-session")),
+    `${encodedRoot}workspace-2026-04-29-claude-code-session`,
   );
 });
 
