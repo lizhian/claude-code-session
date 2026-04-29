@@ -17,13 +17,21 @@ Interactive Claude Code session picker for the current directory and existing Cl
 
 ## Install
 
-Clone the repository, then run the installer:
+Clone the repository, then run the installer.
+
+macOS/Linux:
 
 ```bash
 ./install.sh
 ```
 
-The installer checks that `node` and `claude` are available, copies the picker to `~/.claude-code-session`, makes it executable, and adds `cc` to `~/.zshrc` or `~/.bashrc`.
+Windows PowerShell:
+
+```powershell
+.\install.ps1
+```
+
+The installer checks that `node` and `claude` are available, copies the picker to `~/.claude-code-session`, makes it executable where applicable, and adds `cc` to your shell profile.
 
 After installing, reload your shell:
 
@@ -32,6 +40,12 @@ source ~/.zshrc
 ```
 
 Use `source ~/.bashrc` instead if you use Bash.
+
+On Windows, restart PowerShell or run:
+
+```powershell
+. $PROFILE
+```
 
 ## Usage
 

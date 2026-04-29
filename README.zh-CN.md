@@ -17,13 +17,21 @@
 
 ## 安装
 
-克隆仓库后运行安装脚本：
+克隆仓库后运行安装脚本。
+
+macOS/Linux：
 
 ```bash
 ./install.sh
 ```
 
-安装脚本会检查 `node` 和 `claude` 是否可用，把选择器复制到 `~/.claude-code-session`，设置可执行权限，并在 `~/.zshrc` 或 `~/.bashrc` 中添加 `cc` 别名。
+Windows PowerShell：
+
+```powershell
+.\install.ps1
+```
+
+安装脚本会检查 `node` 和 `claude` 是否可用，把选择器复制到 `~/.claude-code-session`，在适用的平台设置可执行权限，并把 `cc` 添加到对应 shell profile。
 
 安装后重新加载 shell 配置：
 
@@ -35,6 +43,12 @@ source ~/.zshrc
 
 ```bash
 source ~/.bashrc
+```
+
+Windows 下重启 PowerShell，或执行：
+
+```powershell
+. $PROFILE
 ```
 
 ## 使用
