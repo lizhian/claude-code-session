@@ -1,8 +1,8 @@
-# Claude Code 与 Codex Session Picker
+# Claude Code、Codex 与 OpenCode Session Picker
 
 中文 | [English](README.md)
 
-Claude Code 与 Codex 的 session 交互式选择器。原有 Claude Code 选择器继续使用 `cc`，新增 Codex 选择器使用 `cx`。
+Claude Code、Codex 与 OpenCode 的 session 交互式选择器。原有 Claude Code 选择器继续使用 `cc`，Codex 使用 `cx`，OpenCode 使用 `oc`。
 
 ## 功能
 
@@ -15,6 +15,7 @@ Claude Code 与 Codex 的 session 交互式选择器。原有 Claude Code 选择
 - 自动记住上次选择的启动模式。
 - 右方向键进入 Claude Code 工作区选择模式。
 - 使用相同交互方式浏览 Codex sessions 和工作区。
+- 使用相同交互方式浏览 OpenCode sessions 和工作区。
 
 ## 安装
 
@@ -32,7 +33,7 @@ Windows PowerShell：
 .\install.ps1
 ```
 
-安装脚本会检查 `node` 和 `claude` 是否可用；如果 `codex` 不在 PATH 中会给出警告。脚本会把 Claude 选择器复制到 `~/.claude-code-session`，把 Codex 选择器复制到 `~/.codex-code-session`，在适用的平台设置可执行权限，并把 `cc` 和 `cx` 添加到对应 shell profile。
+安装脚本会检查 `node` 和 `claude` 是否可用；如果 `codex`、`opencode` 或 `sqlite3` 不在 PATH 中会给出警告。OpenCode session 浏览会通过 `sqlite3` 读取 OpenCode 的 SQLite 数据库。脚本会把 Claude 选择器复制到 `~/.claude-code-session`，把 Codex 选择器复制到 `~/.codex-code-session`，把 OpenCode 选择器复制到 `~/.opencode-code-session`，在适用的平台设置可执行权限，并把 `cc`、`cx` 和 `oc` 添加到对应 shell profile。
 
 安装后重新加载 shell 配置：
 
@@ -64,6 +65,12 @@ cc
 cx
 ```
 
+查看 OpenCode sessions：
+
+```bash
+oc
+```
+
 交互快捷键：
 
 - 输入文字进行搜索。
@@ -80,6 +87,8 @@ cx
 - 信任模式：执行 `claude --dangerously-skip-permissions`。
 - Codex 普通模式：执行 `codex`。
 - Codex 信任模式：执行 `codex --dangerously-bypass-approvals-and-sandbox`。
+- OpenCode 普通模式：执行 `opencode`。
+- OpenCode 信任模式：带 `OPENCODE_PERMISSION="allow"` 执行 `opencode`。
 
 Claude 启动模式会自动记住，配置保存到：
 
@@ -93,11 +102,18 @@ Codex 启动模式会自动记住，配置保存到：
 ~/.codex-code-session/config.json
 ```
 
+OpenCode 启动模式会自动记住，配置保存到：
+
+```bash
+~/.opencode-code-session/config.json
+```
+
 ## CLI
 
 ```bash
 node claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]
 node codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]
+node opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]
 ```
 
 参数：
@@ -108,6 +124,7 @@ node codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]
 - `--cwd <path>`：查看指定目录的 sessions。
 - `--claude-home <path>`：指定 Claude home，默认使用 `~/.claude` 或 `CLAUDE_HOME`。
 - `--codex-home <path>`：指定 Codex home，默认使用 `~/.codex` 或 `CODEX_HOME`。
+- `--opencode-data-home <path>`：指定 OpenCode 数据目录，默认使用 `~/.local/share/opencode` 或 `OPENCODE_DATA_HOME`。
 
 ## 测试
 

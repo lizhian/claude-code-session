@@ -1,8 +1,8 @@
-# Claude Code and Codex Session Picker
+# Claude Code, Codex, and OpenCode Session Picker
 
 [中文](README.zh-CN.md) | English
 
-Interactive session pickers for Claude Code and Codex. The existing Claude Code picker keeps using `cc`; the Codex picker is available as `cx`.
+Interactive session pickers for Claude Code, Codex, and OpenCode. The existing Claude Code picker keeps using `cc`; Codex uses `cx`; OpenCode uses `oc`.
 
 ## Features
 
@@ -15,6 +15,7 @@ Interactive session pickers for Claude Code and Codex. The existing Claude Code 
 - Remember the last selected launch mode.
 - Browse existing Claude Code workspaces with the right arrow key.
 - Browse existing Codex sessions and workspaces with the same picker behavior.
+- Browse existing OpenCode sessions and workspaces with the same picker behavior.
 
 ## Install
 
@@ -32,7 +33,7 @@ Windows PowerShell:
 .\install.ps1
 ```
 
-The installer checks that `node` and `claude` are available, and warns if `codex` is missing. It copies the Claude picker to `~/.claude-code-session`, copies the Codex picker to `~/.codex-code-session`, makes them executable where applicable, and adds `cc` and `cx` to your shell profile.
+The installer checks that `node` and `claude` are available, and warns if `codex`, `opencode`, or `sqlite3` is missing. OpenCode session browsing reads OpenCode's SQLite database through `sqlite3`. The installer copies the Claude picker to `~/.claude-code-session`, the Codex picker to `~/.codex-code-session`, and the OpenCode picker to `~/.opencode-code-session`, makes them executable where applicable, and adds `cc`, `cx`, and `oc` to your shell profile.
 
 After installing, reload your shell:
 
@@ -60,6 +61,12 @@ For Codex sessions:
 cx
 ```
 
+For OpenCode sessions:
+
+```bash
+oc
+```
+
 Interactive controls:
 
 - Type to search.
@@ -76,6 +83,8 @@ Launch modes:
 - Trust mode: runs `claude --dangerously-skip-permissions`.
 - Codex normal mode: runs `codex`.
 - Codex trust mode: runs `codex --dangerously-bypass-approvals-and-sandbox`.
+- OpenCode normal mode: runs `opencode`.
+- OpenCode trust mode: runs `opencode` with `OPENCODE_PERMISSION="allow"`.
 
 The selected Claude launch mode is saved to:
 
@@ -89,11 +98,18 @@ The selected Codex launch mode is saved to:
 ~/.codex-code-session/config.json
 ```
 
+The selected OpenCode launch mode is saved to:
+
+```bash
+~/.opencode-code-session/config.json
+```
+
 ## CLI
 
 ```bash
 node claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]
 node codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]
+node opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]
 ```
 
 Options:
@@ -104,6 +120,7 @@ Options:
 - `--cwd <path>`: list sessions for a specific directory.
 - `--claude-home <path>`: set Claude home, defaulting to `~/.claude` or `CLAUDE_HOME`.
 - `--codex-home <path>`: set Codex home, defaulting to `~/.codex` or `CODEX_HOME`.
+- `--opencode-data-home <path>`: set OpenCode data home, defaulting to `~/.local/share/opencode` or `OPENCODE_DATA_HOME`.
 
 ## Test
 

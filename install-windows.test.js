@@ -13,9 +13,18 @@ test("Windows installer contains required environment checks", () => {
   assert.match(script, /Get-Command claude/);
   assert.match(script, /Get-Command codex/);
   assert.match(script, /Write-Warning "codex/);
+  assert.match(script, /Get-Command opencode/);
+  assert.match(script, /Write-Warning "opencode/);
+  assert.match(script, /Get-Command sqlite3/);
+  assert.match(script, /Write-Warning "sqlite3/);
   assert.match(script, /claude-sessions\.js/);
+  assert.match(script, /session-utils\.js/);
   assert.match(script, /codex-sessions\.js/);
+  assert.match(script, /opencode-sessions\.js/);
   assert.match(script, /CodexSupportScript/);
+  assert.match(script, /CodexUtilsScript/);
+  assert.match(script, /OpenCodeSupportScript/);
+  assert.match(script, /OpenCodeUtilsScript/);
 });
 
 test("Windows installer installs under the shared install directory", () => {
@@ -23,19 +32,24 @@ test("Windows installer installs under the shared install directory", () => {
 
   assert.match(script, /\.claude-code-session/);
   assert.match(script, /\.codex-code-session/);
+  assert.match(script, /\.opencode-code-session/);
   assert.match(script, /Copy-Item/);
   assert.match(script, /\$HOME/);
 });
 
-test("Windows installer adds idempotent cc and cx functions to PowerShell profile", () => {
+test("Windows installer adds idempotent cc, cx, and oc functions to PowerShell profile", () => {
   const script = fs.readFileSync(installScript, "utf8");
 
   assert.match(script, /Claude Code session picker BEGIN/);
   assert.match(script, /Claude Code session picker END/);
   assert.match(script, /Codex session picker BEGIN/);
   assert.match(script, /Codex session picker END/);
+  assert.match(script, /OpenCode session picker BEGIN/);
+  assert.match(script, /OpenCode session picker END/);
   assert.match(script, /function cc/);
   assert.match(script, /function cx/);
+  assert.match(script, /function oc/);
   assert.match(script, /node \$script:ClaudeCodeSessionScript --pick --trust-current-folder @args/);
   assert.match(script, /node \$script:CodexSessionScript --pick --trust-current-folder @args/);
+  assert.match(script, /node \$script:OpenCodeSessionScript --pick --trust-current-folder @args/);
 });

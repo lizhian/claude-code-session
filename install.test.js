@@ -13,6 +13,13 @@ function makeExecutable(file) {
   fs.chmodSync(file, 0o755);
 }
 
+function linkSystemCommand(bin, name) {
+  const result = spawnSync("/bin/sh", ["-lc", `command -v ${name}`], { encoding: "utf8" });
+  assert.equal(result.status, 0, `${name} was not found`);
+  const target = result.stdout.trim();
+  fs.symlinkSync(target, path.join(bin, name));
+}
+
 function runInstall(options = {}) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cc-install-"));
   const home = path.join(tempDir, "home");
@@ -20,12 +27,24 @@ function runInstall(options = {}) {
   fs.mkdirSync(home, { recursive: true });
   fs.mkdirSync(bin, { recursive: true });
 
+  if (options.isolatedPath) {
+    for (const command of ["awk", "basename", "chmod", "cp", "dirname", "mkdir", "mktemp", "mv", "touch"]) {
+      linkSystemCommand(bin, command);
+    }
+  }
+
   makeExecutable(path.join(bin, "node"));
   if (options.withClaude !== false) {
     makeExecutable(path.join(bin, "claude"));
   }
   if (options.withCodex !== false) {
     makeExecutable(path.join(bin, "codex"));
+  }
+  if (options.withOpenCode !== false) {
+    makeExecutable(path.join(bin, "opencode"));
+  }
+  if (options.withSqlite !== false) {
+    makeExecutable(path.join(bin, "sqlite3"));
   }
 
   if (options.shellRcName) {
@@ -37,7 +56,7 @@ function runInstall(options = {}) {
     env: {
       ...process.env,
       HOME: home,
-      PATH: `${bin}${path.delimiter}/usr/bin${path.delimiter}/bin`,
+      PATH: options.isolatedPath ? bin : `${bin}${path.delimiter}/usr/bin${path.delimiter}/bin`,
       SHELL: options.shell || "/bin/zsh",
     },
     encoding: "utf8",
@@ -53,18 +72,33 @@ test("install script copies the picker and adds a zsh alias", () => {
     shellRcContent: "# existing config\n",
   });
   const installedScript = path.join(home, ".claude-code-session", "claude-sessions.js");
+  const installedUtilsScript = path.join(home, ".claude-code-session", "session-utils.js");
   const installedCodexScript = path.join(home, ".codex-code-session", "codex-sessions.js");
   const installedCodexSupportScript = path.join(home, ".codex-code-session", "claude-sessions.js");
+  const installedCodexUtilsScript = path.join(home, ".codex-code-session", "session-utils.js");
+  const installedOpenCodeScript = path.join(home, ".opencode-code-session", "opencode-sessions.js");
+  const installedOpenCodeSupportScript = path.join(home, ".opencode-code-session", "claude-sessions.js");
+  const installedOpenCodeUtilsScript = path.join(home, ".opencode-code-session", "session-utils.js");
   const zshrc = fs.readFileSync(path.join(home, ".zshrc"), "utf8");
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal(fs.existsSync(installedScript), true);
+  assert.equal(fs.existsSync(installedUtilsScript), true);
   assert.equal(fs.existsSync(installedCodexScript), true);
   assert.equal(fs.existsSync(installedCodexSupportScript), true);
+  assert.equal(fs.existsSync(installedCodexUtilsScript), true);
+  assert.equal(fs.existsSync(installedOpenCodeScript), true);
+  assert.equal(fs.existsSync(installedOpenCodeSupportScript), true);
+  assert.equal(fs.existsSync(installedOpenCodeUtilsScript), true);
   assert.equal(fs.statSync(installedScript).mode & 0o111, 0o111);
+  assert.equal(fs.statSync(installedUtilsScript).mode & 0o111, 0o111);
   assert.equal(fs.statSync(installedCodexScript).mode & 0o111, 0o111);
+  assert.equal(fs.statSync(installedCodexUtilsScript).mode & 0o111, 0o111);
+  assert.equal(fs.statSync(installedOpenCodeScript).mode & 0o111, 0o111);
+  assert.equal(fs.statSync(installedOpenCodeUtilsScript).mode & 0o111, 0o111);
   assert.match(zshrc, /# Claude Code session picker/);
   assert.match(zshrc, /# Codex session picker/);
+  assert.match(zshrc, /# OpenCode session picker/);
   assert.match(
     zshrc,
     new RegExp(`alias cc='${installedScript.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --pick --trust-current-folder'`),
@@ -72,6 +106,10 @@ test("install script copies the picker and adds a zsh alias", () => {
   assert.match(
     zshrc,
     new RegExp(`alias cx='${installedCodexScript.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --pick --trust-current-folder'`),
+  );
+  assert.match(
+    zshrc,
+    new RegExp(`alias oc='${installedOpenCodeScript.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --pick --trust-current-folder'`),
   );
 });
 
@@ -82,6 +120,8 @@ test("install script is idempotent and replaces the managed alias", () => {
     "alias cc='/old/path --pick --trust-current-folder'",
     "# Codex session picker",
     "alias cx='/old/codex/path --pick --trust-current-folder'",
+    "# OpenCode session picker",
+    "alias oc='/old/opencode/path --pick --trust-current-folder'",
     "# after",
     "",
   ].join("\n");
@@ -95,8 +135,10 @@ test("install script is idempotent and replaces the managed alias", () => {
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal((bashrc.match(/# Claude Code session picker/g) || []).length, 1);
   assert.equal((bashrc.match(/# Codex session picker/g) || []).length, 1);
+  assert.equal((bashrc.match(/# OpenCode session picker/g) || []).length, 1);
   assert.doesNotMatch(bashrc, /\/old\/path/);
   assert.doesNotMatch(bashrc, /\/old\/codex\/path/);
+  assert.doesNotMatch(bashrc, /\/old\/opencode\/path/);
   assert.match(bashrc, /# before/);
   assert.match(bashrc, /# after/);
 });
@@ -113,4 +155,18 @@ test("install script still installs aliases when Codex CLI is missing", () => {
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stderr, /codex/);
+});
+
+test("install script still installs aliases when OpenCode CLI is missing", () => {
+  const { result } = runInstall({ withOpenCode: false });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stderr, /opencode/);
+});
+
+test("install script still installs aliases when sqlite3 is missing", () => {
+  const { result } = runInstall({ withSqlite: false, isolatedPath: true });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stderr, /sqlite3/);
 });

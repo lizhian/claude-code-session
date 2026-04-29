@@ -3,46 +3,35 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const readline = require("node:readline");
-const { spawn } = require("node:child_process");
+const {
+  askQuestion,
+  clampSelectedIndex,
+  createSessionPicker,
+  filterWorkspaces,
+  loadLaunchMode: loadLaunchModeFromConfig,
+  normalizeLaunchMode,
+  readJsonLines,
+  runCommand,
+  saveLaunchMode: saveLaunchModeToConfig,
+  workspaceItems,
+} = require("./session-utils");
 
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".claude-code-session", "config.json");
-const VALID_LAUNCH_MODES = new Set(["normal", "trust"]);
 
 function encodeProjectPath(cwd) {
   return path.resolve(cwd).replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
-function normalizeLaunchMode(launchMode) {
-  return VALID_LAUNCH_MODES.has(launchMode) ? launchMode : "normal";
-}
-
-function readConfig(configPath = DEFAULT_CONFIG_PATH) {
-  if (!fs.existsSync(configPath)) {
-    return {};
-  }
-
-  try {
-    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    return config && typeof config === "object" && !Array.isArray(config) ? config : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeConfig(config, configPath = DEFAULT_CONFIG_PATH) {
-  fs.mkdirSync(path.dirname(configPath), { recursive: true });
-  fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+function defaultClaudeHome() {
+  return process.env.CLAUDE_HOME || path.join(os.homedir(), ".claude");
 }
 
 function loadLaunchMode(configPath = DEFAULT_CONFIG_PATH) {
-  return normalizeLaunchMode(readConfig(configPath).launchMode);
+  return loadLaunchModeFromConfig(configPath);
 }
 
 function saveLaunchMode(launchMode, configPath = DEFAULT_CONFIG_PATH) {
-  const config = readConfig(configPath);
-  config.launchMode = normalizeLaunchMode(launchMode);
-  writeConfig(config, configPath);
+  saveLaunchModeToConfig(launchMode, configPath);
 }
 
 function textFromContent(content) {
@@ -100,26 +89,6 @@ function promptTextFromRecord(record) {
     .join(" ");
 }
 
-function readJsonLines(file) {
-  const raw = fs.readFileSync(file, "utf8");
-  const records = [];
-  let parseErrorCount = 0;
-
-  for (const line of raw.split(/\r?\n/)) {
-    if (!line.trim()) {
-      continue;
-    }
-
-    try {
-      records.push(JSON.parse(line));
-    } catch {
-      parseErrorCount += 1;
-    }
-  }
-
-  return { records, parseErrorCount };
-}
-
 function summarizeSession(file, projectDir) {
   const { records, parseErrorCount } = readJsonLines(file);
   const timestamps = records
@@ -148,7 +117,7 @@ function summarizeSession(file, projectDir) {
 
 function listSessions(options = {}) {
   const cwd = path.resolve(options.cwd || process.cwd());
-  const claudeHome = path.resolve(options.claudeHome || process.env.CLAUDE_HOME || path.join(os.homedir(), ".claude"));
+  const claudeHome = path.resolve(options.claudeHome || defaultClaudeHome());
   const projectDir = path.join(claudeHome, "projects", encodeProjectPath(cwd));
 
   if (!fs.existsSync(projectDir)) {
@@ -197,7 +166,7 @@ function summarizeWorkspace(projectDir) {
 }
 
 function listWorkspaces(options = {}) {
-  const claudeHome = path.resolve(options.claudeHome || process.env.CLAUDE_HOME || path.join(os.homedir(), ".claude"));
+  const claudeHome = path.resolve(options.claudeHome || defaultClaudeHome());
   const projectsDir = path.join(claudeHome, "projects");
 
   if (!fs.existsSync(projectsDir)) {
@@ -399,37 +368,6 @@ function filterSessions(sessions, query) {
   });
 }
 
-function workspaceSearchText(workspace) {
-  return [
-    workspace.cwd,
-    workspace.projectDir,
-    workspace.updatedAt,
-    workspace.startedAt,
-    workspace.firstUserMessage,
-    workspace.lastUserMessage,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
-function filterWorkspaces(workspaces, query) {
-  const terms = String(query || "")
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (terms.length === 0) {
-    return workspaces;
-  }
-
-  return workspaces.filter((workspace) => {
-    const searchText = workspaceSearchText(workspace);
-    return terms.every((term) => searchText.includes(term));
-  });
-}
-
 function formatSessions(sessions) {
   if (sessions.length === 0) {
     return "当前目录没有找到 Claude Code session。";
@@ -493,17 +431,6 @@ function pickerItems(sessions, query) {
   ];
 }
 
-function workspaceItems(workspaces, query) {
-  return filterWorkspaces(workspaces, query).map((workspace) => ({ type: "workspace", workspace }));
-}
-
-function clampSelectedIndex(selectedIndex, itemCount) {
-  if (itemCount <= 0) {
-    return 0;
-  }
-  return Math.min(Math.max(0, selectedIndex), itemCount - 1);
-}
-
 function splitPromptWidths(availableWidth) {
   if (availableWidth < 5) {
     return { firstWidth: Math.max(0, availableWidth), lastWidth: 0 };
@@ -518,10 +445,6 @@ function splitPromptWidths(availableWidth) {
 
 function launchModeLabel(launchMode) {
   return launchMode === "trust" ? "信任模式" : "普通模式";
-}
-
-function toggleLaunchMode(launchMode) {
-  return launchMode === "trust" ? "normal" : "trust";
 }
 
 function renderInteractivePicker(options) {
@@ -676,36 +599,6 @@ function buildClaudeCommand(sessions, choice, options = {}) {
   return { command: "claude", args: [...baseArgs, "--resume", session.id] };
 }
 
-function askQuestion(prompt) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(prompt, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
-
-function runCommand(command, args, options = {}) {
-  const child = spawn(command, args, {
-    stdio: "inherit",
-    env: process.env,
-    cwd: options.cwd || process.cwd(),
-  });
-
-  child.on("exit", (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal);
-      return;
-    }
-    process.exitCode = code || 0;
-  });
-}
-
 function selectedItemToCommand(item, options = {}) {
   const baseArgs = launchArgs(options.launchMode);
   if (!item || item.type === "new") {
@@ -736,215 +629,17 @@ function markProjectTrusted(cwd = process.cwd(), configPath = path.join(os.homed
   fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
 }
 
-function pickSessionInteractive(initialSessions, io = {}) {
-  const input = io.input || process.stdin;
-  const output = io.output || process.stdout;
-  const claudeHome = path.resolve(io.claudeHome || process.env.CLAUDE_HOME || path.join(os.homedir(), ".claude"));
-  const configPath = io.configPath || DEFAULT_CONFIG_PATH;
-
-  if (!input.isTTY || !output.isTTY) {
-    return null;
-  }
-
-  let currentCwd = path.resolve(io.cwd || process.cwd());
-  let sessions = initialSessions || listSessions({ cwd: currentCwd, claudeHome });
-  let workspaces = null;
-  let view = "sessions";
-  let launchMode = normalizeLaunchMode(io.launchMode || loadLaunchMode(configPath));
-  let sessionQuery = "";
-  let workspaceQuery = "";
-  let sessionSelectedIndex = 0;
-  let workspaceSelectedIndex = 0;
-  let previousQueryHadText = false;
-
-  readline.emitKeypressEvents(input);
-  input.setRawMode(true);
-  output.write("\x1b[?25l");
-
-  return new Promise((resolve) => {
-    function cleanup() {
-      input.off("keypress", onKeypress);
-      input.setRawMode(false);
-      input.pause();
-      output.write("\x1b[?25h");
-      output.write("\x1b[2J\x1b[H");
-    }
-
-    function currentSessionItems() {
-      return pickerItems(sessions, sessionQuery);
-    }
-
-    function currentWorkspaceItems() {
-      if (!workspaces) {
-        workspaces = listWorkspaces({ claudeHome });
-      }
-      return workspaceItems(workspaces, workspaceQuery);
-    }
-
-    function render() {
-      output.write("\x1b[2J\x1b[H");
-
-      if (view === "workspaces") {
-        const itemCount = currentWorkspaceItems().length;
-        workspaceSelectedIndex = clampSelectedIndex(workspaceSelectedIndex, itemCount);
-        output.write(
-          renderWorkspacePicker({
-            workspaces: workspaces || [],
-            query: workspaceQuery,
-            selectedIndex: workspaceSelectedIndex,
-            rows: output.rows || 24,
-            columns: output.columns || 100,
-          }),
-        );
-        return;
-      }
-
-      const itemCount = currentSessionItems().length;
-      sessionSelectedIndex = clampSelectedIndex(sessionSelectedIndex, itemCount);
-      output.write(
-        renderInteractivePicker({
-          sessions,
-          query: sessionQuery,
-          selectedIndex: sessionSelectedIndex,
-          launchMode,
-          cwd: currentCwd,
-          rows: output.rows || 24,
-          columns: output.columns || 100,
-        }),
-      );
-    }
-
-    function onKeypress(str, key = {}) {
-      if (key.ctrl && key.name === "c") {
-        cleanup();
-        resolve(null);
-        return;
-      }
-
-      if (key.name === "escape") {
-        cleanup();
-        resolve(null);
-        return;
-      }
-
-      if (key.name === "return" || key.name === "enter") {
-        if (view === "workspaces") {
-          const items = currentWorkspaceItems();
-          const item = items[clampSelectedIndex(workspaceSelectedIndex, items.length)];
-          if (item && item.workspace) {
-            currentCwd = path.resolve(item.workspace.cwd || item.workspace.projectDir || currentCwd);
-            sessions = listSessions({ cwd: currentCwd, claudeHome });
-            view = "sessions";
-            sessionQuery = "";
-            sessionSelectedIndex = 0;
-            previousQueryHadText = false;
-            render();
-          }
-          return;
-        }
-
-        const items = currentSessionItems();
-        const item = items[clampSelectedIndex(sessionSelectedIndex, items.length)];
-        cleanup();
-        resolve({
-          item: item || { type: "new", label: "New session" },
-          launchMode,
-          cwd: currentCwd,
-        });
-        return;
-      }
-
-      if (key.name === "tab") {
-        launchMode = toggleLaunchMode(launchMode);
-        saveLaunchMode(launchMode, configPath);
-        render();
-        return;
-      }
-
-      if (key.name === "right" && view === "sessions") {
-        if (!workspaces) {
-          workspaces = listWorkspaces({ claudeHome });
-        }
-        view = "workspaces";
-        workspaceSelectedIndex = 0;
-        previousQueryHadText = Boolean(workspaceQuery);
-        render();
-        return;
-      }
-
-      if (key.name === "left" && view === "workspaces") {
-        view = "sessions";
-        previousQueryHadText = Boolean(sessionQuery);
-        render();
-        return;
-      }
-
-      if (key.name === "up") {
-        if (view === "workspaces") {
-          workspaceSelectedIndex = Math.max(0, workspaceSelectedIndex - 1);
-        } else {
-          sessionSelectedIndex = Math.max(0, sessionSelectedIndex - 1);
-        }
-        render();
-        return;
-      }
-
-      if (key.name === "down") {
-        if (view === "workspaces") {
-          workspaceSelectedIndex = Math.min(
-            Math.max(0, currentWorkspaceItems().length - 1),
-            workspaceSelectedIndex + 1,
-          );
-        } else {
-          sessionSelectedIndex = Math.min(
-            Math.max(0, currentSessionItems().length - 1),
-            sessionSelectedIndex + 1,
-          );
-        }
-        render();
-        return;
-      }
-
-      if (key.name === "backspace" || key.name === "delete") {
-        if (view === "workspaces") {
-          workspaceQuery = workspaceQuery.slice(0, -1);
-        } else {
-          sessionQuery = sessionQuery.slice(0, -1);
-        }
-        const query = view === "workspaces" ? workspaceQuery : sessionQuery;
-        if (!query) {
-          previousQueryHadText = false;
-          if (view === "workspaces") {
-            workspaceSelectedIndex = 0;
-          } else {
-            sessionSelectedIndex = 0;
-          }
-        }
-        render();
-        return;
-      }
-
-      if (str && str >= " " && !key.ctrl && !key.meta) {
-        if (view === "workspaces") {
-          workspaceQuery += str;
-          if (!previousQueryHadText && filterWorkspaces(workspaces || [], workspaceQuery).length > 0) {
-            workspaceSelectedIndex = 0;
-          }
-        } else {
-          sessionQuery += str;
-          if (!previousQueryHadText && filterSessions(sessions, sessionQuery).length > 0) {
-            sessionSelectedIndex = 1;
-          }
-        }
-        previousQueryHadText = true;
-        render();
-      }
-    }
-
-    input.on("keypress", onKeypress);
-    render();
-  });
-}
+const pickSessionInteractive = createSessionPicker({
+  configPath: DEFAULT_CONFIG_PATH,
+  defaultHome: defaultClaudeHome,
+  homeOptionName: "claudeHome",
+  listSessions,
+  listWorkspaces,
+  filterSessions,
+  renderInteractivePicker,
+  renderWorkspacePicker,
+  workspaceCwd: (workspace, currentCwd) => workspace.cwd || workspace.projectDir || currentCwd,
+});
 
 async function pickAndRunClaude(sessions, options = {}) {
   const configPath = options.configPath || DEFAULT_CONFIG_PATH;
