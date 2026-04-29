@@ -6,8 +6,8 @@
     "claude-code-session": "./claude-sessions.js"
   },
   "scripts": {
-    "test": "node --test claude-sessions.test.js",
-    "check": "node --check claude-sessions.js"
+    "test": "node --test claude-sessions.test.js install.test.js",
+    "check": "node --check claude-sessions.js && bash -n install.sh"
   },
   "keywords": [
     "claude",

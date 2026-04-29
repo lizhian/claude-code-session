@@ -15,17 +15,21 @@ Interactive Claude Code session picker for the current directory and existing Cl
 
 ## Install
 
-Clone the repository, then use the script directly:
+Clone the repository, then run the installer:
 
 ```bash
-./claude-sessions.js --pick --trust-current-folder
+./install.sh
 ```
 
-Or add an alias to your shell config:
+The installer checks that `node` and `claude` are available, copies the picker to `~/.claude-code-session`, makes it executable, and adds `cc` to `~/.zshrc` or `~/.bashrc`.
+
+After installing, reload your shell:
 
 ```bash
-alias cc='/path/to/claude-sessions.js --pick --trust-current-folder'
+source ~/.zshrc
 ```
+
+Use `source ~/.bashrc` instead if you use Bash.
 
 ## Usage
 
