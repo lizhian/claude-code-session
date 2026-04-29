@@ -15,6 +15,7 @@ const {
   renderWorkspacePicker,
   selectedItemToCommand,
 } = require("./opencode-sessions");
+const { nextPermissionMode } = require("./session-utils");
 
 function sqlite(dbPath, sql) {
   const result = spawnSync("sqlite3", [dbPath, sql], { encoding: "utf8" });
@@ -158,12 +159,16 @@ test("builds opencode command for new session and resume choices", () => {
     command: "opencode",
     args: ["--session", "ses_demo_1"],
   });
-  assert.deepEqual(buildOpenCodeCommand(sessions, "1", { launchMode: "trust" }), {
+  assert.deepEqual(buildOpenCodeCommand(sessions, "1", { permissionMode: "auto" }), {
+    command: "opencode",
+    args: [],
+  });
+  assert.deepEqual(buildOpenCodeCommand(sessions, "1", { permissionMode: "full" }), {
     command: "opencode",
     args: [],
     env: { OPENCODE_PERMISSION: "\"allow\"" },
   });
-  assert.deepEqual(buildOpenCodeCommand(sessions, "2", { launchMode: "trust" }), {
+  assert.deepEqual(buildOpenCodeCommand(sessions, "2", { permissionMode: "full" }), {
     command: "opencode",
     args: ["--session", "ses_demo_1"],
     env: { OPENCODE_PERMISSION: "\"allow\"" },
@@ -171,7 +176,7 @@ test("builds opencode command for new session and resume choices", () => {
 });
 
 test("builds interactive opencode command without unsupported trust flags", () => {
-  assert.deepEqual(selectedItemToCommand({ type: "new" }, { launchMode: "trust", cwd: "/tmp/project" }), {
+  assert.deepEqual(selectedItemToCommand({ type: "new" }, { permissionMode: "full", cwd: "/tmp/project" }), {
     command: "opencode",
     args: [],
     cwd: "/tmp/project",
@@ -180,7 +185,7 @@ test("builds interactive opencode command without unsupported trust flags", () =
   assert.deepEqual(
     selectedItemToCommand(
       { type: "session", session: { id: "ses_demo_1" } },
-      { launchMode: "trust", cwd: "/tmp/project" },
+      { permissionMode: "full", cwd: "/tmp/project" },
     ),
     {
       command: "opencode",
@@ -199,6 +204,11 @@ test("builds normal interactive opencode command without trust environment", () 
   });
 });
 
+test("cycles OpenCode picker permissions without auto mode", () => {
+  assert.equal(nextPermissionMode("default", ["default", "full"]), "full");
+  assert.equal(nextPermissionMode("full", ["default", "full"]), "default");
+});
+
 test("renders OpenCode picker titles without changing picker behavior", () => {
   const output = renderInteractivePicker({
     sessions: [
@@ -211,11 +221,13 @@ test("renders OpenCode picker titles without changing picker behavior", () => {
       },
     ],
     selectedIndex: 1,
+    permissionMode: "auto",
     cwd: "/tmp/demo",
     now: new Date("2026-04-27T22:56:33.359Z"),
   });
 
   assert.match(output, /OpenCode sessions/);
+  assert.match(output, /Permission: default/);
   assert.match(output, /> 2\. ses_demo/);
 });
 

@@ -8,11 +8,11 @@ const {
   clampSelectedIndex,
   createSessionPicker,
   filterWorkspaces,
-  loadLaunchMode: loadLaunchModeFromConfig,
-  normalizeLaunchMode,
+  loadPermissionMode: loadPermissionModeFromConfig,
+  normalizePermissionMode,
   readJsonLines,
   runCommand,
-  saveLaunchMode: saveLaunchModeToConfig,
+  savePermissionMode: savePermissionModeToConfig,
   workspaceItems,
 } = require("./session-utils");
 
@@ -26,12 +26,20 @@ function defaultClaudeHome() {
   return process.env.CLAUDE_HOME || path.join(os.homedir(), ".claude");
 }
 
+function loadPermissionMode(configPath = DEFAULT_CONFIG_PATH, permissionModes) {
+  return loadPermissionModeFromConfig(configPath, permissionModes);
+}
+
+function savePermissionMode(permissionMode, configPath = DEFAULT_CONFIG_PATH, permissionModes) {
+  savePermissionModeToConfig(permissionMode, configPath, permissionModes);
+}
+
 function loadLaunchMode(configPath = DEFAULT_CONFIG_PATH) {
-  return loadLaunchModeFromConfig(configPath);
+  return loadPermissionMode(configPath);
 }
 
 function saveLaunchMode(launchMode, configPath = DEFAULT_CONFIG_PATH) {
-  saveLaunchModeToConfig(launchMode, configPath);
+  savePermissionMode(launchMode, configPath);
 }
 
 function textFromContent(content) {
@@ -443,14 +451,14 @@ function splitPromptWidths(availableWidth) {
   return { firstWidth, lastWidth };
 }
 
-function launchModeLabel(launchMode) {
-  return launchMode === "trust" ? "信任模式" : "普通模式";
+function permissionModeLabel(permissionMode) {
+  return normalizePermissionMode(permissionMode);
 }
 
 function renderInteractivePicker(options) {
   const sessions = options.sessions || [];
   const query = options.query || "";
-  const launchMode = options.launchMode || "normal";
+  const permissionMode = normalizePermissionMode(options.permissionMode || options.launchMode);
   const cwd = options.cwd || process.cwd();
   const now = options.now || new Date();
   const rows = options.rows || process.stdout.rows || 24;
@@ -480,7 +488,7 @@ function renderInteractivePicker(options) {
   const lines = [
     fitLine("Claude Code sessions", columns),
     fitLine(`Workspace: ${cwd}`, columns),
-    fitLine(`Launch: ${launchModeLabel(launchMode)}    Tab switch    → workspaces`, columns),
+    fitLine(`Permission: ${permissionModeLabel(permissionMode)}    Tab switch    → workspaces`, columns),
     fitLine(`Search: ${query}`, columns),
     fitLine(`Matches: ${filteredCount}    ↑/↓ move  type search  Enter open  Esc cancel`, columns),
     "",
@@ -574,13 +582,20 @@ function renderWorkspacePicker(options) {
   return lines.join("\n");
 }
 
-function launchArgs(launchMode) {
-  return launchMode === "trust" ? ["--dangerously-skip-permissions"] : [];
+function launchArgs(permissionMode) {
+  const mode = normalizePermissionMode(permissionMode);
+  if (mode === "auto") {
+    return ["--enable-auto-mode"];
+  }
+  if (mode === "full") {
+    return ["--dangerously-skip-permissions"];
+  }
+  return [];
 }
 
 function buildClaudeCommand(sessions, choice, options = {}) {
   const normalized = String(choice || "").trim();
-  const baseArgs = launchArgs(options.launchMode);
+  const baseArgs = launchArgs(options.permissionMode || options.launchMode);
 
   if (normalized === "" || normalized === "1") {
     return { command: "claude", args: baseArgs };
@@ -600,7 +615,7 @@ function buildClaudeCommand(sessions, choice, options = {}) {
 }
 
 function selectedItemToCommand(item, options = {}) {
-  const baseArgs = launchArgs(options.launchMode);
+  const baseArgs = launchArgs(options.permissionMode || options.launchMode);
   if (!item || item.type === "new") {
     return { command: "claude", args: baseArgs, cwd: options.cwd };
   }
@@ -643,14 +658,16 @@ const pickSessionInteractive = createSessionPicker({
 
 async function pickAndRunClaude(sessions, options = {}) {
   const configPath = options.configPath || DEFAULT_CONFIG_PATH;
-  const launchMode = normalizeLaunchMode(options.launchMode || loadLaunchMode(configPath));
+  const permissionMode = normalizePermissionMode(
+    options.permissionMode || options.launchMode || loadPermissionMode(configPath),
+  );
   const picked = await pickSessionInteractive(sessions, options);
   if (picked) {
     if (options.trustCurrentFolder) {
       markProjectTrusted(picked.cwd);
     }
     const { command, args, cwd } = selectedItemToCommand(picked.item, {
-      launchMode: picked.launchMode,
+      permissionMode: picked.permissionMode,
       cwd: picked.cwd,
     });
     runCommand(command, args, { cwd });
@@ -669,7 +686,7 @@ async function pickAndRunClaude(sessions, options = {}) {
   if (options.trustCurrentFolder) {
     markProjectTrusted(options.cwd);
   }
-  const { command, args } = buildClaudeCommand(sessions, answer, { ...options, launchMode });
+  const { command, args } = buildClaudeCommand(sessions, answer, { ...options, permissionMode });
   runCommand(command, args, { cwd: options.cwd });
 }
 
@@ -722,8 +739,8 @@ function usage() {
     "Usage: node claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]",
     "",
     "获取指定目录对应的 Claude Code sessions。默认读取当前目录和 ~/.claude。",
-    "交互模式快捷键：Tab 切换普通/信任启动模式，→ 选择 Claude Code 工作区，← 返回 session 列表。",
-    "启动模式会自动记住，配置保存在 ~/.claude-code-session/config.json。",
+    "交互模式快捷键：Tab 切换 default/auto/full permission，→ 选择 Claude Code 工作区，← 返回 session 列表。",
+    "权限模式会自动记住，配置保存在 ~/.claude-code-session/config.json。",
     "",
     "Options:",
     "  --json                 输出 JSON，方便 jq 或其他脚本处理",
@@ -806,6 +823,7 @@ module.exports = {
   formatSessions,
   filterWorkspaces,
   loadLaunchMode,
+  loadPermissionMode,
   listSessions,
   listWorkspaces,
   markProjectTrusted,
@@ -815,6 +833,7 @@ module.exports = {
   renderInteractivePicker,
   renderWorkspacePicker,
   saveLaunchMode,
+  savePermissionMode,
   shortSessionId,
   summarizeSession,
   truncateToWidth,

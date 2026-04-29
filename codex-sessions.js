@@ -8,12 +8,12 @@ const {
   filterSessions,
   formatPicker,
   formatSessions: formatClaudeSessions,
-  loadLaunchMode,
+  loadPermissionMode,
 } = require("./claude-sessions");
 const {
   askQuestion,
   createSessionPicker,
-  normalizeLaunchMode,
+  normalizePermissionMode,
   readJsonLines,
   runCommand,
 } = require("./session-utils");
@@ -215,13 +215,20 @@ function formatSessions(sessions) {
   return formatClaudeSessions(sessions).replace("Claude Code session", "Codex session");
 }
 
-function launchArgs(launchMode) {
-  return launchMode === "trust" ? ["--dangerously-bypass-approvals-and-sandbox"] : [];
+function launchArgs(permissionMode) {
+  const mode = normalizePermissionMode(permissionMode);
+  if (mode === "auto") {
+    return ["--full-auto"];
+  }
+  if (mode === "full") {
+    return ["--dangerously-bypass-approvals-and-sandbox"];
+  }
+  return [];
 }
 
 function buildCodexCommand(sessions, choice, options = {}) {
   const normalized = String(choice || "").trim();
-  const baseArgs = launchArgs(options.launchMode);
+  const baseArgs = launchArgs(options.permissionMode || options.launchMode);
 
   if (normalized === "" || normalized === "1") {
     return { command: "codex", args: baseArgs };
@@ -241,7 +248,7 @@ function buildCodexCommand(sessions, choice, options = {}) {
 }
 
 function selectedItemToCommand(item, options = {}) {
-  const baseArgs = launchArgs(options.launchMode);
+  const baseArgs = launchArgs(options.permissionMode || options.launchMode);
   if (!item || item.type === "new") {
     return { command: "codex", args: baseArgs, cwd: options.cwd };
   }
@@ -296,14 +303,16 @@ const pickSessionInteractive = createSessionPicker({
 
 async function pickAndRunCodex(sessions, options = {}) {
   const configPath = options.configPath || DEFAULT_CONFIG_PATH;
-  const launchMode = normalizeLaunchMode(options.launchMode || loadLaunchMode(configPath));
+  const permissionMode = normalizePermissionMode(
+    options.permissionMode || options.launchMode || loadPermissionMode(configPath),
+  );
   const picked = await pickSessionInteractive(sessions, options);
   if (picked) {
     if (options.trustCurrentFolder) {
       markProjectTrusted(picked.cwd, path.join(options.codexHome || defaultCodexHome(), "config.toml"));
     }
     const { command, args, cwd } = selectedItemToCommand(picked.item, {
-      launchMode: picked.launchMode,
+      permissionMode: picked.permissionMode,
       cwd: picked.cwd,
     });
     runCommand(command, args, { cwd });
@@ -322,7 +331,7 @@ async function pickAndRunCodex(sessions, options = {}) {
   if (options.trustCurrentFolder) {
     markProjectTrusted(options.cwd, path.join(options.codexHome || defaultCodexHome(), "config.toml"));
   }
-  const { command, args } = buildCodexCommand(sessions, answer, { ...options, launchMode });
+  const { command, args } = buildCodexCommand(sessions, answer, { ...options, permissionMode });
   runCommand(command, args, { cwd: options.cwd });
 }
 
@@ -375,8 +384,8 @@ function usage() {
     "Usage: node codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]",
     "",
     "获取指定目录对应的 Codex sessions。默认读取当前目录和 ~/.codex。",
-    "交互模式快捷键：Tab 切换普通/信任启动模式，→ 选择 Codex 工作区，← 返回 session 列表。",
-    "启动模式会自动记住，配置保存在 ~/.codex-code-session/config.json。",
+    "交互模式快捷键：Tab 切换 default/auto/full permission，→ 选择 Codex 工作区，← 返回 session 列表。",
+    "权限模式会自动记住，配置保存在 ~/.codex-code-session/config.json。",
     "",
     "Options:",
     "  --json                 输出 JSON，方便 jq 或其他脚本处理",

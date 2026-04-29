@@ -3,10 +3,32 @@ const path = require("node:path");
 const readline = require("node:readline");
 const { spawn } = require("node:child_process");
 
-const VALID_LAUNCH_MODES = new Set(["normal", "trust"]);
+const DEFAULT_PERMISSION_MODES = ["default", "auto", "full"];
+const VALID_PERMISSION_MODES = new Set(DEFAULT_PERMISSION_MODES);
+
+function permissionModeFromLegacyLaunchMode(launchMode) {
+  if (launchMode === "trust") {
+    return "full";
+  }
+  if (launchMode === "normal") {
+    return "default";
+  }
+  return launchMode;
+}
+
+function supportedPermissionModes(permissionModes = DEFAULT_PERMISSION_MODES) {
+  const modes = permissionModes.filter((mode) => VALID_PERMISSION_MODES.has(mode));
+  return modes.length > 0 ? modes : ["default"];
+}
+
+function normalizePermissionMode(permissionMode, permissionModes = DEFAULT_PERMISSION_MODES) {
+  const modes = supportedPermissionModes(permissionModes);
+  const normalized = permissionModeFromLegacyLaunchMode(permissionMode);
+  return modes.includes(normalized) ? normalized : "default";
+}
 
 function normalizeLaunchMode(launchMode) {
-  return VALID_LAUNCH_MODES.has(launchMode) ? launchMode : "normal";
+  return normalizePermissionMode(launchMode);
 }
 
 function readConfig(configPath) {
@@ -27,14 +49,27 @@ function writeConfig(config, configPath) {
   fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
 }
 
+function loadPermissionMode(configPath, permissionModes = DEFAULT_PERMISSION_MODES) {
+  const config = readConfig(configPath);
+  if (config.permissionMode) {
+    return normalizePermissionMode(config.permissionMode, permissionModes);
+  }
+  return normalizePermissionMode(config.launchMode, permissionModes);
+}
+
 function loadLaunchMode(configPath) {
-  return normalizeLaunchMode(readConfig(configPath).launchMode);
+  return loadPermissionMode(configPath);
+}
+
+function savePermissionMode(permissionMode, configPath, permissionModes = DEFAULT_PERMISSION_MODES) {
+  const config = readConfig(configPath);
+  config.permissionMode = normalizePermissionMode(permissionMode, permissionModes);
+  delete config.launchMode;
+  writeConfig(config, configPath);
 }
 
 function saveLaunchMode(launchMode, configPath) {
-  const config = readConfig(configPath);
-  config.launchMode = normalizeLaunchMode(launchMode);
-  writeConfig(config, configPath);
+  savePermissionMode(launchMode, configPath);
 }
 
 function readJsonLines(file) {
@@ -102,8 +137,15 @@ function clampSelectedIndex(selectedIndex, itemCount) {
   return Math.min(Math.max(0, selectedIndex), itemCount - 1);
 }
 
+function nextPermissionMode(permissionMode, permissionModes = DEFAULT_PERMISSION_MODES) {
+  const modes = supportedPermissionModes(permissionModes);
+  const normalized = normalizePermissionMode(permissionMode, modes);
+  const currentIndex = modes.indexOf(normalized);
+  return modes[(currentIndex + 1) % modes.length];
+}
+
 function toggleLaunchMode(launchMode) {
-  return launchMode === "trust" ? "normal" : "trust";
+  return nextPermissionMode(launchMode);
 }
 
 function askQuestion(prompt) {
@@ -146,7 +188,10 @@ function createSessionPicker({
   renderInteractivePicker,
   renderWorkspacePicker,
   workspaceCwd,
+  permissionModes = DEFAULT_PERMISSION_MODES,
 }) {
+  const pickerPermissionModes = supportedPermissionModes(permissionModes);
+
   return function pickSessionInteractive(initialSessions, io = {}) {
     const input = io.input || process.stdin;
     const output = io.output || process.stdout;
@@ -161,7 +206,10 @@ function createSessionPicker({
     let sessions = initialSessions || listSessions({ cwd: currentCwd, [homeOptionName]: dataHome });
     let workspaces = null;
     let view = "sessions";
-    let launchMode = normalizeLaunchMode(io.launchMode || loadLaunchMode(launchConfigPath));
+    let permissionMode = normalizePermissionMode(
+      io.permissionMode || io.launchMode || loadPermissionMode(launchConfigPath, pickerPermissionModes),
+      pickerPermissionModes,
+    );
     let sessionQuery = "";
     let workspaceQuery = "";
     let sessionSelectedIndex = 0;
@@ -220,7 +268,7 @@ function createSessionPicker({
             sessions,
             query: sessionQuery,
             selectedIndex: sessionSelectedIndex,
-            launchMode,
+            permissionMode,
             cwd: currentCwd,
             rows: output.rows || 24,
             columns: output.columns || 100,
@@ -256,15 +304,15 @@ function createSessionPicker({
           cleanup();
           resolve({
             item: item || { type: "new", label: "New session" },
-            launchMode,
+            permissionMode,
             cwd: currentCwd,
           });
           return;
         }
 
         if (key.name === "tab") {
-          launchMode = toggleLaunchMode(launchMode);
-          saveLaunchMode(launchMode, launchConfigPath);
+          permissionMode = nextPermissionMode(permissionMode, pickerPermissionModes);
+          savePermissionMode(permissionMode, launchConfigPath, pickerPermissionModes);
           render();
           return;
         }
@@ -361,9 +409,13 @@ module.exports = {
   createSessionPicker,
   filterWorkspaces,
   loadLaunchMode,
+  loadPermissionMode,
   normalizeLaunchMode,
+  normalizePermissionMode,
+  nextPermissionMode,
   readJsonLines,
   runCommand,
   saveLaunchMode,
+  savePermissionMode,
   workspaceItems,
 };

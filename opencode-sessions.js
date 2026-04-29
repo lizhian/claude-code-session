@@ -9,12 +9,12 @@ const {
   filterSessions,
   formatPicker,
   formatSessions: formatClaudeSessions,
-  loadLaunchMode,
+  loadPermissionMode,
 } = require("./claude-sessions");
 const {
   askQuestion,
   createSessionPicker,
-  normalizeLaunchMode,
+  normalizePermissionMode,
   runCommand,
 } = require("./session-utils");
 
@@ -165,7 +165,13 @@ function listWorkspaces(options = {}) {
 
 function renderInteractivePicker(options = {}) {
   return require("./claude-sessions")
-    .renderInteractivePicker(options)
+    .renderInteractivePicker({
+      ...options,
+      permissionMode: normalizePermissionMode(
+        options.permissionMode || options.launchMode,
+        OPENCODE_PERMISSION_MODES,
+      ),
+    })
     .replace(/^Claude Code sessions/m, "OpenCode sessions");
 }
 
@@ -179,18 +185,23 @@ function formatSessions(sessions) {
   return formatClaudeSessions(sessions).replace("Claude Code session", "OpenCode session");
 }
 
-function launchArgs(launchMode) {
+const OPENCODE_PERMISSION_MODES = ["default", "full"];
+
+function launchArgs(permissionMode) {
   return [];
 }
 
-function launchEnv(launchMode) {
-  return launchMode === "trust" ? { OPENCODE_PERMISSION: "\"allow\"" } : undefined;
+function launchEnv(permissionMode) {
+  return normalizePermissionMode(permissionMode, OPENCODE_PERMISSION_MODES) === "full"
+    ? { OPENCODE_PERMISSION: "\"allow\"" }
+    : undefined;
 }
 
 function buildOpenCodeCommand(sessions, choice, options = {}) {
   const normalized = String(choice || "").trim();
-  const baseArgs = launchArgs(options.launchMode);
-  const env = launchEnv(options.launchMode);
+  const permissionMode = options.permissionMode || options.launchMode;
+  const baseArgs = launchArgs(permissionMode);
+  const env = launchEnv(permissionMode);
 
   if (normalized === "" || normalized === "1") {
     return { command: "opencode", args: baseArgs, ...(env ? { env } : {}) };
@@ -210,8 +221,9 @@ function buildOpenCodeCommand(sessions, choice, options = {}) {
 }
 
 function selectedItemToCommand(item, options = {}) {
-  const baseArgs = launchArgs(options.launchMode);
-  const env = launchEnv(options.launchMode);
+  const permissionMode = options.permissionMode || options.launchMode;
+  const baseArgs = launchArgs(permissionMode);
+  const env = launchEnv(permissionMode);
   if (!item || item.type === "new") {
     return { command: "opencode", args: baseArgs, cwd: options.cwd, ...(env ? { env } : {}) };
   }
@@ -228,15 +240,19 @@ const pickSessionInteractive = createSessionPicker({
   renderInteractivePicker,
   renderWorkspacePicker,
   workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
+  permissionModes: OPENCODE_PERMISSION_MODES,
 });
 
 async function pickAndRunOpenCode(sessions, options = {}) {
   const configPath = options.configPath || DEFAULT_CONFIG_PATH;
-  const launchMode = normalizeLaunchMode(options.launchMode || loadLaunchMode(configPath));
+  const permissionMode = normalizePermissionMode(
+    options.permissionMode || options.launchMode || loadPermissionMode(configPath, OPENCODE_PERMISSION_MODES),
+    OPENCODE_PERMISSION_MODES,
+  );
   const picked = await pickSessionInteractive(sessions, options);
   if (picked) {
     const { command, args, cwd, env } = selectedItemToCommand(picked.item, {
-      launchMode: picked.launchMode,
+      permissionMode: picked.permissionMode,
       cwd: picked.cwd,
     });
     runCommand(command, args, { cwd, env });
@@ -252,7 +268,7 @@ async function pickAndRunOpenCode(sessions, options = {}) {
   console.log("");
 
   const answer = await askQuestion("选择 session 编号，直接回车创建 New session: ");
-  const { command, args, env } = buildOpenCodeCommand(sessions, answer, { ...options, launchMode });
+  const { command, args, env } = buildOpenCodeCommand(sessions, answer, { ...options, permissionMode });
   runCommand(command, args, { cwd: options.cwd, env });
 }
 
@@ -305,13 +321,13 @@ function usage() {
     "Usage: node opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]",
     "",
     "获取指定目录对应的 OpenCode sessions。默认读取当前目录和 ~/.local/share/opencode。",
-    "交互模式快捷键：Tab 切换普通/信任启动模式，→ 选择 OpenCode 工作区，← 返回 session 列表。",
-    "启动模式会自动记住，配置保存在 ~/.opencode-code-session/config.json。",
+    "交互模式快捷键：Tab 切换 default/full permission，→ 选择 OpenCode 工作区，← 返回 session 列表。",
+    "权限模式会自动记住，配置保存在 ~/.opencode-code-session/config.json。",
     "",
     "Options:",
     "  --json                       输出 JSON，方便 jq 或其他脚本处理",
     "  --pick                       交互选择 New session 或恢复某个 session",
-    "  --trust-current-folder       兼容安装别名；OpenCode 信任模式通过 OPENCODE_PERMISSION 控制权限",
+    "  --trust-current-folder       兼容安装别名；OpenCode full permission 通过 OPENCODE_PERMISSION 控制权限",
     "  --cwd <path>                 指定要查询的项目目录，默认是当前目录",
     "  --opencode-data-home <path>  指定 OpenCode 数据目录，默认是 ~/.local/share/opencode 或 OPENCODE_DATA_HOME",
     "  -h, --help                   显示帮助",

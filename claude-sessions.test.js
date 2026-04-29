@@ -7,7 +7,7 @@ const test = require("node:test");
 const {
   DEFAULT_CONFIG_PATH,
   buildClaudeCommand,
-  loadLaunchMode,
+  loadPermissionMode,
   displayWidth,
   encodeProjectPath,
   filterSessions,
@@ -18,7 +18,7 @@ const {
   markProjectTrusted,
   renderInteractivePicker,
   renderWorkspacePicker,
-  saveLaunchMode,
+  savePermissionMode,
   shortSessionId,
   truncateToWidth,
   listSessions,
@@ -147,43 +147,64 @@ test("builds claude command for new session and resume choices", () => {
     command: "claude",
     args: ["--resume", "11111111-2222-3333-4444-555555555555"],
   });
-  assert.deepEqual(buildClaudeCommand(sessions, "1", { launchMode: "trust" }), {
+  assert.deepEqual(buildClaudeCommand(sessions, "1", { permissionMode: "auto" }), {
+    command: "claude",
+    args: ["--enable-auto-mode"],
+  });
+  assert.deepEqual(buildClaudeCommand(sessions, "2", { permissionMode: "auto" }), {
+    command: "claude",
+    args: ["--enable-auto-mode", "--resume", "11111111-2222-3333-4444-555555555555"],
+  });
+  assert.deepEqual(buildClaudeCommand(sessions, "1", { permissionMode: "full" }), {
     command: "claude",
     args: ["--dangerously-skip-permissions"],
   });
-  assert.deepEqual(buildClaudeCommand(sessions, "2", { launchMode: "trust" }), {
+  assert.deepEqual(buildClaudeCommand(sessions, "2", { permissionMode: "full" }), {
     command: "claude",
     args: ["--dangerously-skip-permissions", "--resume", "11111111-2222-3333-4444-555555555555"],
   });
 });
 
-test("loads normal launch mode when config is missing or invalid", () => {
+test("loads default permission mode when config is missing or invalid", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-session-config-"));
   const configPath = path.join(tempDir, "config.json");
 
-  assert.equal(loadLaunchMode(configPath), "normal");
+  assert.equal(loadPermissionMode(configPath), "default");
 
   fs.writeFileSync(configPath, "{not json");
-  assert.equal(loadLaunchMode(configPath), "normal");
+  assert.equal(loadPermissionMode(configPath), "default");
 
-  fs.writeFileSync(configPath, JSON.stringify({ launchMode: "invalid" }));
-  assert.equal(loadLaunchMode(configPath), "normal");
+  fs.writeFileSync(configPath, JSON.stringify({ permissionMode: "invalid" }));
+  assert.equal(loadPermissionMode(configPath), "default");
 });
 
-test("saves launch mode so the next picker run can use it as default", () => {
+test("loads legacy launch mode as permission mode", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-session-config-"));
+  const configPath = path.join(tempDir, "config.json");
+
+  fs.writeFileSync(configPath, JSON.stringify({ launchMode: "trust" }));
+  assert.equal(loadPermissionMode(configPath), "full");
+
+  fs.writeFileSync(configPath, JSON.stringify({ launchMode: "normal" }));
+  assert.equal(loadPermissionMode(configPath), "default");
+});
+
+test("saves permission mode so the next picker run can use it as default", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-session-config-"));
   const configPath = path.join(tempDir, "nested", "config.json");
 
-  saveLaunchMode("trust", configPath);
-  assert.equal(loadLaunchMode(configPath), "trust");
+  savePermissionMode("full", configPath);
+  assert.equal(loadPermissionMode(configPath), "full");
 
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   config.extra = "keep me";
+  config.launchMode = "trust";
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-  saveLaunchMode("normal", configPath);
+  savePermissionMode("auto", configPath);
   const updatedConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
-  assert.equal(updatedConfig.launchMode, "normal");
+  assert.equal(updatedConfig.permissionMode, "auto");
+  assert.equal(updatedConfig.launchMode, undefined);
   assert.equal(updatedConfig.extra, "keep me");
 });
 
@@ -245,14 +266,14 @@ test("renders searchable picker with highlighted selection", () => {
     ],
     query: "last",
     selectedIndex: 1,
-    launchMode: "trust",
+    permissionMode: "full",
     cwd: "/tmp/payment-api",
     now: new Date("2026-04-29T12:00:00.000Z"),
     rows: 20,
   });
 
   assert.match(output, /Workspace: \/tmp\/payment-api/);
-  assert.match(output, /Launch: 信任模式/);
+  assert.match(output, /Permission: full/);
   assert.match(output, /Tab switch/);
   assert.match(output, /→ workspaces/);
   assert.match(output, /Search: last/);

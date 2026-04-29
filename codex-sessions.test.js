@@ -124,11 +124,19 @@ test("builds codex command for new session and resume choices", () => {
     command: "codex",
     args: ["resume", "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4"],
   });
-  assert.deepEqual(buildCodexCommand(sessions, "1", { launchMode: "trust" }), {
+  assert.deepEqual(buildCodexCommand(sessions, "1", { permissionMode: "auto" }), {
+    command: "codex",
+    args: ["--full-auto"],
+  });
+  assert.deepEqual(buildCodexCommand(sessions, "2", { permissionMode: "auto" }), {
+    command: "codex",
+    args: ["--full-auto", "resume", "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4"],
+  });
+  assert.deepEqual(buildCodexCommand(sessions, "1", { permissionMode: "full" }), {
     command: "codex",
     args: ["--dangerously-bypass-approvals-and-sandbox"],
   });
-  assert.deepEqual(buildCodexCommand(sessions, "2", { launchMode: "trust" }), {
+  assert.deepEqual(buildCodexCommand(sessions, "2", { permissionMode: "full" }), {
     command: "codex",
     args: ["--dangerously-bypass-approvals-and-sandbox", "resume", "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4"],
   });
