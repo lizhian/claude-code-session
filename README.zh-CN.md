@@ -1,8 +1,8 @@
-# Claude Code Session Picker
+# Claude Code 与 Codex Session Picker
 
 中文 | [English](README.md)
 
-一个 Claude Code session 交互式选择器，用来查看当前目录和已有 Claude Code 工作区的历史 session，并快速新建或恢复 session。
+Claude Code 与 Codex 的 session 交互式选择器。原有 Claude Code 选择器继续使用 `cc`，新增 Codex 选择器使用 `cx`。
 
 ## 功能
 
@@ -14,6 +14,7 @@
 - 支持普通模式和信任模式切换。
 - 自动记住上次选择的启动模式。
 - 右方向键进入 Claude Code 工作区选择模式。
+- 使用相同交互方式浏览 Codex sessions 和工作区。
 
 ## 安装
 
@@ -31,7 +32,7 @@ Windows PowerShell：
 .\install.ps1
 ```
 
-安装脚本会检查 `node` 和 `claude` 是否可用，把选择器复制到 `~/.claude-code-session`，在适用的平台设置可执行权限，并把 `cc` 添加到对应 shell profile。
+安装脚本会检查 `node` 和 `claude` 是否可用；如果 `codex` 不在 PATH 中会给出警告。脚本会把 Claude 选择器复制到 `~/.claude-code-session`，把 Codex 选择器复制到 `~/.codex-code-session`，在适用的平台设置可执行权限，并把 `cc` 和 `cx` 添加到对应 shell profile。
 
 安装后重新加载 shell 配置：
 
@@ -57,6 +58,12 @@ Windows 下重启 PowerShell，或执行：
 cc
 ```
 
+查看 Codex sessions：
+
+```bash
+cx
+```
+
 交互快捷键：
 
 - 输入文字进行搜索。
@@ -71,17 +78,26 @@ cc
 
 - 普通模式：执行 `claude`。
 - 信任模式：执行 `claude --dangerously-skip-permissions`。
+- Codex 普通模式：执行 `codex`。
+- Codex 信任模式：执行 `codex --dangerously-bypass-approvals-and-sandbox`。
 
-启动模式会自动记住，配置保存到：
+Claude 启动模式会自动记住，配置保存到：
 
 ```bash
 ~/.claude-code-session/config.json
+```
+
+Codex 启动模式会自动记住，配置保存到：
+
+```bash
+~/.codex-code-session/config.json
 ```
 
 ## CLI
 
 ```bash
 node claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]
+node codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]
 ```
 
 参数：
@@ -91,6 +107,7 @@ node claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]
 - `--trust-current-folder`：在 Claude Code 配置中把当前目录标记为已信任。
 - `--cwd <path>`：查看指定目录的 sessions。
 - `--claude-home <path>`：指定 Claude home，默认使用 `~/.claude` 或 `CLAUDE_HOME`。
+- `--codex-home <path>`：指定 Codex home，默认使用 `~/.codex` 或 `CODEX_HOME`。
 
 ## 测试
 

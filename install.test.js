@@ -24,6 +24,9 @@ function runInstall(options = {}) {
   if (options.withClaude !== false) {
     makeExecutable(path.join(bin, "claude"));
   }
+  if (options.withCodex !== false) {
+    makeExecutable(path.join(bin, "codex"));
+  }
 
   if (options.shellRcName) {
     fs.writeFileSync(path.join(home, options.shellRcName), options.shellRcContent || "");
@@ -50,15 +53,25 @@ test("install script copies the picker and adds a zsh alias", () => {
     shellRcContent: "# existing config\n",
   });
   const installedScript = path.join(home, ".claude-code-session", "claude-sessions.js");
+  const installedCodexScript = path.join(home, ".codex-code-session", "codex-sessions.js");
+  const installedCodexSupportScript = path.join(home, ".codex-code-session", "claude-sessions.js");
   const zshrc = fs.readFileSync(path.join(home, ".zshrc"), "utf8");
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal(fs.existsSync(installedScript), true);
+  assert.equal(fs.existsSync(installedCodexScript), true);
+  assert.equal(fs.existsSync(installedCodexSupportScript), true);
   assert.equal(fs.statSync(installedScript).mode & 0o111, 0o111);
+  assert.equal(fs.statSync(installedCodexScript).mode & 0o111, 0o111);
   assert.match(zshrc, /# Claude Code session picker/);
+  assert.match(zshrc, /# Codex session picker/);
   assert.match(
     zshrc,
     new RegExp(`alias cc='${installedScript.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --pick --trust-current-folder'`),
+  );
+  assert.match(
+    zshrc,
+    new RegExp(`alias cx='${installedCodexScript.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --pick --trust-current-folder'`),
   );
 });
 
@@ -67,6 +80,8 @@ test("install script is idempotent and replaces the managed alias", () => {
     "# before",
     "# Claude Code session picker",
     "alias cc='/old/path --pick --trust-current-folder'",
+    "# Codex session picker",
+    "alias cx='/old/codex/path --pick --trust-current-folder'",
     "# after",
     "",
   ].join("\n");
@@ -79,7 +94,9 @@ test("install script is idempotent and replaces the managed alias", () => {
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal((bashrc.match(/# Claude Code session picker/g) || []).length, 1);
+  assert.equal((bashrc.match(/# Codex session picker/g) || []).length, 1);
   assert.doesNotMatch(bashrc, /\/old\/path/);
+  assert.doesNotMatch(bashrc, /\/old\/codex\/path/);
   assert.match(bashrc, /# before/);
   assert.match(bashrc, /# after/);
 });
@@ -89,4 +106,11 @@ test("install script fails when Claude Code CLI is missing", () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /claude/);
+});
+
+test("install script still installs aliases when Codex CLI is missing", () => {
+  const { result } = runInstall({ withCodex: false });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stderr, /codex/);
 });

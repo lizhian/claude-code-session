@@ -1,8 +1,8 @@
-# Claude Code Session Picker
+# Claude Code and Codex Session Picker
 
 [中文](README.zh-CN.md) | English
 
-Interactive Claude Code session picker for the current directory and existing Claude Code workspaces.
+Interactive session pickers for Claude Code and Codex. The existing Claude Code picker keeps using `cc`; the Codex picker is available as `cx`.
 
 ## Features
 
@@ -14,6 +14,7 @@ Interactive Claude Code session picker for the current directory and existing Cl
 - Switch between normal launch mode and trust launch mode.
 - Remember the last selected launch mode.
 - Browse existing Claude Code workspaces with the right arrow key.
+- Browse existing Codex sessions and workspaces with the same picker behavior.
 
 ## Install
 
@@ -31,7 +32,7 @@ Windows PowerShell:
 .\install.ps1
 ```
 
-The installer checks that `node` and `claude` are available, copies the picker to `~/.claude-code-session`, makes it executable where applicable, and adds `cc` to your shell profile.
+The installer checks that `node` and `claude` are available, and warns if `codex` is missing. It copies the Claude picker to `~/.claude-code-session`, copies the Codex picker to `~/.codex-code-session`, makes them executable where applicable, and adds `cc` and `cx` to your shell profile.
 
 After installing, reload your shell:
 
@@ -53,6 +54,12 @@ On Windows, restart PowerShell or run:
 cc
 ```
 
+For Codex sessions:
+
+```bash
+cx
+```
+
 Interactive controls:
 
 - Type to search.
@@ -67,17 +74,26 @@ Launch modes:
 
 - Normal mode: runs `claude`.
 - Trust mode: runs `claude --dangerously-skip-permissions`.
+- Codex normal mode: runs `codex`.
+- Codex trust mode: runs `codex --dangerously-bypass-approvals-and-sandbox`.
 
-The selected launch mode is saved to:
+The selected Claude launch mode is saved to:
 
 ```bash
 ~/.claude-code-session/config.json
+```
+
+The selected Codex launch mode is saved to:
+
+```bash
+~/.codex-code-session/config.json
 ```
 
 ## CLI
 
 ```bash
 node claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]
+node codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]
 ```
 
 Options:
@@ -87,6 +103,7 @@ Options:
 - `--trust-current-folder`: mark the current folder as trusted in Claude Code config.
 - `--cwd <path>`: list sessions for a specific directory.
 - `--claude-home <path>`: set Claude home, defaulting to `~/.claude` or `CLAUDE_HOME`.
+- `--codex-home <path>`: set Codex home, defaulting to `~/.codex` or `CODEX_HOME`.
 
 ## Test
 

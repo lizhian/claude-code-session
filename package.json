@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "description": "Interactive Claude Code session picker",
   "bin": {
-    "claude-code-session": "./claude-sessions.js"
+    "claude-code-session": "./claude-sessions.js",
+    "codex-code-session": "./codex-sessions.js"
   },
   "scripts": {
-    "test": "node --test claude-sessions.test.js install.test.js install-windows.test.js",
-    "check": "node --check claude-sessions.js && bash -n install.sh"
+    "test": "node --test claude-sessions.test.js codex-sessions.test.js install.test.js install-windows.test.js",
+    "check": "node --check claude-sessions.js && node --check codex-sessions.js && bash -n install.sh"
   },
   "keywords": [
     "claude",
