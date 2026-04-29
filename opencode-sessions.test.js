@@ -153,22 +153,22 @@ test("reports sqlite3 execution failures clearly", () => {
 test("builds opencode command for new session and resume choices", () => {
   const sessions = [{ id: "ses_demo_1" }];
 
-  assert.deepEqual(buildOpenCodeCommand(sessions, "1"), { command: "opencode", args: [] });
+  assert.deepEqual(buildOpenCodeCommand(sessions, "0"), { command: "opencode", args: [] });
   assert.deepEqual(buildOpenCodeCommand(sessions, ""), { command: "opencode", args: [] });
-  assert.deepEqual(buildOpenCodeCommand(sessions, "2"), {
+  assert.deepEqual(buildOpenCodeCommand(sessions, "1"), {
     command: "opencode",
     args: ["--session", "ses_demo_1"],
   });
-  assert.deepEqual(buildOpenCodeCommand(sessions, "1", { permissionMode: "auto" }), {
+  assert.deepEqual(buildOpenCodeCommand(sessions, "0", { permissionMode: "auto" }), {
     command: "opencode",
     args: [],
   });
-  assert.deepEqual(buildOpenCodeCommand(sessions, "1", { permissionMode: "full" }), {
+  assert.deepEqual(buildOpenCodeCommand(sessions, "0", { permissionMode: "full" }), {
     command: "opencode",
     args: [],
     env: { OPENCODE_PERMISSION: "\"allow\"" },
   });
-  assert.deepEqual(buildOpenCodeCommand(sessions, "2", { permissionMode: "full" }), {
+  assert.deepEqual(buildOpenCodeCommand(sessions, "1", { permissionMode: "full" }), {
     command: "opencode",
     args: ["--session", "ses_demo_1"],
     env: { OPENCODE_PERMISSION: "\"allow\"" },
@@ -228,7 +228,7 @@ test("renders OpenCode picker titles without changing picker behavior", () => {
 
   assert.match(output, /OpenCode sessions/);
   assert.match(output, /Permission: default/);
-  assert.match(output, /> 2\. ses_demo/);
+  assert.match(output, /> 1\. ses_demo/);
 });
 
 test("renders OpenCode workspace picker title", () => {

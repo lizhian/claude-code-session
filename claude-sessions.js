@@ -412,10 +412,10 @@ function formatSessions(sessions) {
 }
 
 function formatPicker(sessions, now = new Date()) {
-  const lines = ["1. New session"];
+  const lines = ["0. New session"];
 
   sessions.forEach((session, index) => {
-    const number = index + 2;
+    const number = index + 1;
     const updated = formatSessionTime(session.updatedAt, now);
     const prompt = truncate(displayUserMessages(session), 96) || "-";
     lines.push(`${number}. ${shortSessionId(session.id)}  ${updated}  ${session.messageCount} messages  ${prompt}`);
@@ -455,6 +455,12 @@ function permissionModeLabel(permissionMode) {
   return normalizePermissionMode(permissionMode);
 }
 
+function pickerStatusLine(permissionMode, filteredCount, query) {
+  const permission = padDisplay(`Permission: ${permissionModeLabel(permissionMode)}`, 24);
+  const matches = padDisplay(`Matches: ${filteredCount}`, 18);
+  return `${permission}${matches}Search: ${query}`;
+}
+
 function renderInteractivePicker(options) {
   const sessions = options.sessions || [];
   const query = options.query || "";
@@ -469,7 +475,7 @@ function renderInteractivePicker(options) {
   const maxItemRows = Math.max(1, rows - 7);
   const start = Math.max(0, Math.min(selectedIndex - maxItemRows + 1, items.length - maxItemRows));
   const visibleItems = items.slice(start, start + maxItemRows);
-  const numberWidth = Math.max(2, displayWidth(`${items.length}.`));
+  const numberWidth = Math.max(2, displayWidth(`${Math.max(0, items.length - 1)}.`));
   const timeWidth = Math.max(
     "UPDATED".length,
     ...visibleItems
@@ -488,9 +494,7 @@ function renderInteractivePicker(options) {
   const lines = [
     fitLine("Claude Code sessions", columns),
     fitLine(`Workspace: ${cwd}`, columns),
-    fitLine(`Permission: ${permissionModeLabel(permissionMode)}    Tab switch    → workspaces`, columns),
-    fitLine(`Search: ${query}`, columns),
-    fitLine(`Matches: ${filteredCount}    ↑/↓ move  type search  Enter open  Esc cancel`, columns),
+    fitLine(pickerStatusLine(permissionMode, filteredCount, query), columns),
     "",
   ];
 
@@ -499,11 +503,11 @@ function renderInteractivePicker(options) {
     const prefix = itemIndex === selectedIndex ? "> " : "  ";
 
     if (item.type === "new") {
-      lines.push(fitLine(`${prefix}${padDisplay("1.", numberWidth, "right")} New session`, columns));
+      lines.push(fitLine(`${prefix}${padDisplay("0.", numberWidth, "right")} New session`, columns));
       return;
     }
 
-    const number = itemIndex + 1;
+    const number = itemIndex;
     const session = item.session;
     const updated = formatSessionTime(session.updatedAt, now);
     const messages = `${session.messageCount} msg`;
@@ -541,7 +545,7 @@ function renderWorkspacePicker(options) {
   const maxItemRows = Math.max(1, rows - 5);
   const start = Math.max(0, Math.min(selectedIndex - maxItemRows + 1, items.length - maxItemRows));
   const visibleItems = items.slice(start, start + maxItemRows);
-  const numberWidth = Math.max(2, displayWidth(`${Math.max(1, items.length)}.`));
+  const numberWidth = Math.max(2, displayWidth(`${Math.max(0, items.length - 1)}.`));
   const timeWidth = Math.max(
     "UPDATED".length,
     ...visibleItems.map((item) => displayWidth(formatSessionTime(item.workspace.updatedAt, now))),
@@ -555,14 +559,14 @@ function renderWorkspacePicker(options) {
   const lines = [
     fitLine("Claude Code workspaces", columns),
     fitLine(`Search: ${query}`, columns),
-    fitLine(`Matches: ${filteredCount}    ↑/↓ move  type search  Enter choose  ← sessions  Esc cancel`, columns),
+    fitLine(`Matches: ${filteredCount}`, columns),
     "",
   ];
 
   visibleItems.forEach((item, visibleOffset) => {
     const itemIndex = start + visibleOffset;
     const prefix = itemIndex === selectedIndex ? "> " : "  ";
-    const number = itemIndex + 1;
+    const number = itemIndex;
     const workspace = item.workspace;
     const updated = formatSessionTime(workspace.updatedAt, now);
     const sessions = `${workspace.sessionCount} sessions`;
@@ -597,7 +601,7 @@ function buildClaudeCommand(sessions, choice, options = {}) {
   const normalized = String(choice || "").trim();
   const baseArgs = launchArgs(options.permissionMode || options.launchMode);
 
-  if (normalized === "" || normalized === "1") {
+  if (normalized === "" || normalized === "0") {
     return { command: "claude", args: baseArgs };
   }
 
@@ -606,7 +610,7 @@ function buildClaudeCommand(sessions, choice, options = {}) {
     throw new Error(`Invalid choice: ${choice}`);
   }
 
-  const session = sessions[selectedNumber - 2];
+  const session = sessions[selectedNumber - 1];
   if (!session) {
     throw new Error(`Invalid choice: ${choice}`);
   }

@@ -118,25 +118,25 @@ test("lists Codex workspaces grouped by cwd", () => {
 test("builds codex command for new session and resume choices", () => {
   const sessions = [{ id: "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4" }];
 
-  assert.deepEqual(buildCodexCommand(sessions, "1"), { command: "codex", args: [] });
+  assert.deepEqual(buildCodexCommand(sessions, "0"), { command: "codex", args: [] });
   assert.deepEqual(buildCodexCommand(sessions, ""), { command: "codex", args: [] });
-  assert.deepEqual(buildCodexCommand(sessions, "2"), {
+  assert.deepEqual(buildCodexCommand(sessions, "1"), {
     command: "codex",
     args: ["resume", "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4"],
   });
-  assert.deepEqual(buildCodexCommand(sessions, "1", { permissionMode: "auto" }), {
+  assert.deepEqual(buildCodexCommand(sessions, "0", { permissionMode: "auto" }), {
     command: "codex",
     args: ["--full-auto"],
   });
-  assert.deepEqual(buildCodexCommand(sessions, "2", { permissionMode: "auto" }), {
+  assert.deepEqual(buildCodexCommand(sessions, "1", { permissionMode: "auto" }), {
     command: "codex",
     args: ["--full-auto", "resume", "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4"],
   });
-  assert.deepEqual(buildCodexCommand(sessions, "1", { permissionMode: "full" }), {
+  assert.deepEqual(buildCodexCommand(sessions, "0", { permissionMode: "full" }), {
     command: "codex",
     args: ["--dangerously-bypass-approvals-and-sandbox"],
   });
-  assert.deepEqual(buildCodexCommand(sessions, "2", { permissionMode: "full" }), {
+  assert.deepEqual(buildCodexCommand(sessions, "1", { permissionMode: "full" }), {
     command: "codex",
     args: ["--dangerously-bypass-approvals-and-sandbox", "resume", "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4"],
   });
@@ -159,7 +159,7 @@ test("renders Codex picker titles without changing picker behavior", () => {
   });
 
   assert.match(output, /Codex sessions/);
-  assert.match(output, /> 2\. 019dd9bd/);
+  assert.match(output, /> 1\. 019dd9bd/);
 });
 
 test("renders Codex workspace picker title", () => {

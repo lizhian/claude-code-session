@@ -230,7 +230,7 @@ function buildCodexCommand(sessions, choice, options = {}) {
   const normalized = String(choice || "").trim();
   const baseArgs = launchArgs(options.permissionMode || options.launchMode);
 
-  if (normalized === "" || normalized === "1") {
+  if (normalized === "" || normalized === "0") {
     return { command: "codex", args: baseArgs };
   }
 
@@ -239,7 +239,7 @@ function buildCodexCommand(sessions, choice, options = {}) {
     throw new Error(`Invalid choice: ${choice}`);
   }
 
-  const session = sessions[selectedNumber - 2];
+  const session = sessions[selectedNumber - 1];
   if (!session) {
     throw new Error(`Invalid choice: ${choice}`);
   }

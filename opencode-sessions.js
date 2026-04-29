@@ -203,7 +203,7 @@ function buildOpenCodeCommand(sessions, choice, options = {}) {
   const baseArgs = launchArgs(permissionMode);
   const env = launchEnv(permissionMode);
 
-  if (normalized === "" || normalized === "1") {
+  if (normalized === "" || normalized === "0") {
     return { command: "opencode", args: baseArgs, ...(env ? { env } : {}) };
   }
 
@@ -212,7 +212,7 @@ function buildOpenCodeCommand(sessions, choice, options = {}) {
     throw new Error(`Invalid choice: ${choice}`);
   }
 
-  const session = sessions[selectedNumber - 2];
+  const session = sessions[selectedNumber - 1];
   if (!session) {
     throw new Error(`Invalid choice: ${choice}`);
   }

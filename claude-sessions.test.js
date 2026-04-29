@@ -130,8 +130,8 @@ test("formats interactive picker with new session first", () => {
     },
   ], new Date("2026-04-29T03:00:05.000Z"));
 
-  assert.match(output, /1\. New session/);
-  assert.match(output, /2\. 11111111/);
+  assert.match(output, /0\. New session/);
+  assert.match(output, /1\. 11111111/);
   assert.doesNotMatch(output, /11111111-2222-3333-4444-555555555555/);
   assert.match(output, /3小时前/);
   assert.match(output, /first prompt/);
@@ -141,25 +141,25 @@ test("formats interactive picker with new session first", () => {
 test("builds claude command for new session and resume choices", () => {
   const sessions = [{ id: "11111111-2222-3333-4444-555555555555" }];
 
-  assert.deepEqual(buildClaudeCommand(sessions, "1"), { command: "claude", args: [] });
+  assert.deepEqual(buildClaudeCommand(sessions, "0"), { command: "claude", args: [] });
   assert.deepEqual(buildClaudeCommand(sessions, ""), { command: "claude", args: [] });
-  assert.deepEqual(buildClaudeCommand(sessions, "2"), {
+  assert.deepEqual(buildClaudeCommand(sessions, "1"), {
     command: "claude",
     args: ["--resume", "11111111-2222-3333-4444-555555555555"],
   });
-  assert.deepEqual(buildClaudeCommand(sessions, "1", { permissionMode: "auto" }), {
+  assert.deepEqual(buildClaudeCommand(sessions, "0", { permissionMode: "auto" }), {
     command: "claude",
     args: ["--enable-auto-mode"],
   });
-  assert.deepEqual(buildClaudeCommand(sessions, "2", { permissionMode: "auto" }), {
+  assert.deepEqual(buildClaudeCommand(sessions, "1", { permissionMode: "auto" }), {
     command: "claude",
     args: ["--enable-auto-mode", "--resume", "11111111-2222-3333-4444-555555555555"],
   });
-  assert.deepEqual(buildClaudeCommand(sessions, "1", { permissionMode: "full" }), {
+  assert.deepEqual(buildClaudeCommand(sessions, "0", { permissionMode: "full" }), {
     command: "claude",
     args: ["--dangerously-skip-permissions"],
   });
-  assert.deepEqual(buildClaudeCommand(sessions, "2", { permissionMode: "full" }), {
+  assert.deepEqual(buildClaudeCommand(sessions, "1", { permissionMode: "full" }), {
     command: "claude",
     args: ["--dangerously-skip-permissions", "--resume", "11111111-2222-3333-4444-555555555555"],
   });
@@ -210,7 +210,7 @@ test("saves permission mode so the next picker run can use it as default", () =>
 
 test("rejects invalid picker choices", () => {
   assert.throws(
-    () => buildClaudeCommand([{ id: "11111111-2222-3333-4444-555555555555" }], "3"),
+    () => buildClaudeCommand([{ id: "11111111-2222-3333-4444-555555555555" }], "2"),
     /Invalid choice/,
   );
 });
@@ -273,15 +273,53 @@ test("renders searchable picker with highlighted selection", () => {
   });
 
   assert.match(output, /Workspace: \/tmp\/payment-api/);
-  assert.match(output, /Permission: full/);
-  assert.match(output, /Tab switch/);
-  assert.match(output, /→ workspaces/);
-  assert.match(output, /Search: last/);
-  assert.match(output, /> 2\. 11111111/);
+  assert.match(output, /^Permission: full {8}Matches: 1 {8}Search: last$/m);
+  assert.doesNotMatch(output, /^Search: /m);
+  assert.doesNotMatch(output, /^Matches: /m);
+  assert.doesNotMatch(output, /Tab switch/);
+  assert.doesNotMatch(output, /→ workspaces/);
+  assert.doesNotMatch(output, /↑\/↓ move/);
+  assert.doesNotMatch(output, /type search/);
+  assert.doesNotMatch(output, /Enter open/);
+  assert.doesNotMatch(output, /Esc cancel/);
+  assert.match(output, /> 1\. 11111111/);
   assert.match(output, /first prompt/);
   assert.match(output, /last prompt/);
   assert.match(output, /3小时前/);
   assert.doesNotMatch(output, /11111111-2222-3333-4444-555555555555/);
+});
+
+test("renders picker status fields in fixed columns", () => {
+  const fullOutput = renderInteractivePicker({
+    sessions: [
+      { id: "11111111-2222-3333-4444-555555555555", messageCount: 1 },
+      { id: "22222222-3333-4444-5555-666666666666", messageCount: 1 },
+      { id: "33333333-4444-5555-6666-777777777777", messageCount: 1 },
+    ],
+    permissionMode: "full",
+    cwd: "/tmp/payment-api",
+    rows: 20,
+    columns: 100,
+  });
+  const defaultOutput = renderInteractivePicker({
+    sessions: Array.from({ length: 100 }, (_, index) => ({
+      id: `${String(index).padStart(8, "0")}-2222-3333-4444-555555555555`,
+      messageCount: 1,
+      lastUserMessage: "refunds",
+    })),
+    permissionMode: "default",
+    query: "refunds",
+    cwd: "/tmp/payment-api",
+    rows: 20,
+    columns: 100,
+  });
+  const fullLine = fullOutput.split("\n")[2];
+  const defaultLine = defaultOutput.split("\n")[2];
+
+  assert.equal(fullLine, "Permission: full        Matches: 3        Search: ");
+  assert.equal(defaultLine, "Permission: default     Matches: 100      Search: refunds");
+  assert.equal(fullLine.indexOf("Matches:"), defaultLine.indexOf("Matches:"));
+  assert.equal(fullLine.indexOf("Search:"), defaultLine.indexOf("Search:"));
 });
 
 test("calculates terminal display width and truncates without overflowing", () => {
@@ -419,8 +457,12 @@ test("renders searchable workspace picker", () => {
 
   assert.match(output, /Claude Code workspaces/);
   assert.match(output, /Search: second/);
-  assert.match(output, /← sessions/);
-  assert.match(output, /> 1\. 2026-04-25  1000 sessions/);
+  assert.doesNotMatch(output, /↑\/↓ move/);
+  assert.doesNotMatch(output, /type search/);
+  assert.doesNotMatch(output, /Enter choose/);
+  assert.doesNotMatch(output, /← sessions/);
+  assert.doesNotMatch(output, /Esc cancel/);
+  assert.match(output, /> 0\. 2026-04-25  1000 sessions/);
   assert.match(output, /second-workspace/);
   assert.ok(output.split("\n").every((line) => displayWidth(line) <= 64));
 });
