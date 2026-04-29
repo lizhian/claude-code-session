@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains small Node.js CLIs for browsing Claude Code, Codex, and OpenCode sessions.
+This repository contains small Node.js CLIs for browsing Claude Code, Codex, and OpenCode sessions. Keep the provider CLIs additive: changes for `cx` or `oc` should not regress the existing `cc` behavior.
 
 - `claude-sessions.js`: Claude Code executable and exported helpers for listing, formatting, and launching sessions.
 - `codex-sessions.js`: Codex executable. It reuses Claude picker rendering while keeping Codex-specific session parsing and launch commands.
@@ -13,6 +13,7 @@ This repository contains small Node.js CLIs for browsing Claude Code, Codex, and
 - `install.ps1`: Windows PowerShell installer that adds `cc`, `cx`, and `oc` functions.
 - `install.test.js` and `install-windows.test.js`: installer behavior and smoke tests.
 - `README.md` and `README.zh-CN.md`: user-facing documentation.
+- `package.json`: npm metadata, binary entries, and test/check scripts.
 
 There are no separate `src/`, `test/`, or asset directories; keep new project files at the root unless the codebase grows enough to justify a directory split.
 
@@ -34,7 +35,7 @@ Use CommonJS modules, two-space indentation, double quotes, and semicolons to ma
 
 ## Testing Guidelines
 
-Tests use `node:test` and `node:assert/strict`. Name tests after the behavior under test, for example `test("loads default permission mode when config is missing or invalid", ...)`. Keep tests co-located in root-level `*.test.js` files. Add coverage for CLI parsing, JSONL edge cases, SQLite session rows, config writes, permission-to-command mapping, and installer idempotency when changing those areas.
+Tests use `node:test` and `node:assert/strict`. Name tests after the behavior under test, for example `test("loads default permission mode when config is missing or invalid", ...)`. Keep tests co-located in root-level `*.test.js` files. Add coverage for CLI parsing, JSONL edge cases, SQLite session rows, config writes, permission-to-command mapping, zero-based picker choices, and installer idempotency when changing those areas.
 
 ## Commit & Pull Request Guidelines
 
@@ -42,4 +43,4 @@ Recent history uses conventional commit prefixes such as `feat:`, `fix:`, and `d
 
 ## Security & Configuration Tips
 
-Do not commit generated files from `~/.claude-code-session`, `~/.codex-code-session`, `~/.opencode-code-session`, `~/.claude`, `~/.codex`, or OpenCode's data directory. Be careful with permission flags: Claude full uses `--dangerously-skip-permissions`, Codex full uses `--dangerously-bypass-approvals-and-sandbox`, and OpenCode full uses `OPENCODE_PERMISSION="allow"` instead of an unsupported TUI flag. Claude/Codex support default, auto, and full permission modes; OpenCode currently supports default and full only. Changes around permission mode or `--trust-current-folder` should be explicit in the PR description and covered by tests where possible.
+Do not commit generated files from `~/.claude-code-session`, `~/.codex-code-session`, `~/.opencode-code-session`, `~/.claude`, `~/.codex`, or OpenCode's data directory. Be careful with permission flags: Claude full uses `--dangerously-skip-permissions`, Codex full uses `--dangerously-bypass-approvals-and-sandbox`, and OpenCode full uses `OPENCODE_PERMISSION="allow"` instead of an unsupported TUI flag. Claude/Codex support default, auto, and full permission modes; OpenCode currently supports default and full only. Keep the picker labels in English (`Permission`, `Matches`, `Search`) and keep status columns fixed-width so changing values do not move later fields. Changes around permission mode or `--trust-current-folder` should be explicit in the PR description and covered by tests where possible.

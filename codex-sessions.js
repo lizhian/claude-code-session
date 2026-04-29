@@ -15,6 +15,7 @@ const {
   createSessionPicker,
   normalizePermissionMode,
   readJsonLines,
+  resolveSessionChoice,
   runCommand,
 } = require("./session-utils");
 
@@ -201,8 +202,7 @@ function listWorkspaces(options = {}) {
 function renderInteractivePicker(options = {}) {
   return require("./claude-sessions")
     .renderInteractivePicker(options)
-    .replace(/^Claude Code sessions/m, "Codex sessions")
-    .replace(/→ workspaces/g, "→ workspaces");
+    .replace(/^Claude Code sessions/m, "Codex sessions");
 }
 
 function renderWorkspacePicker(options = {}) {
@@ -227,21 +227,11 @@ function launchArgs(permissionMode) {
 }
 
 function buildCodexCommand(sessions, choice, options = {}) {
-  const normalized = String(choice || "").trim();
   const baseArgs = launchArgs(options.permissionMode || options.launchMode);
+  const session = resolveSessionChoice(sessions, choice);
 
-  if (normalized === "" || normalized === "0") {
-    return { command: "codex", args: baseArgs };
-  }
-
-  const selectedNumber = Number.parseInt(normalized, 10);
-  if (!Number.isInteger(selectedNumber) || String(selectedNumber) !== normalized) {
-    throw new Error(`Invalid choice: ${choice}`);
-  }
-
-  const session = sessions[selectedNumber - 1];
   if (!session) {
-    throw new Error(`Invalid choice: ${choice}`);
+    return { command: "codex", args: baseArgs };
   }
 
   return { command: "codex", args: [...baseArgs, "resume", session.id] };

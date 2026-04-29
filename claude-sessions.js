@@ -11,6 +11,7 @@ const {
   loadPermissionMode: loadPermissionModeFromConfig,
   normalizePermissionMode,
   readJsonLines,
+  resolveSessionChoice,
   runCommand,
   savePermissionMode: savePermissionModeToConfig,
   workspaceItems,
@@ -598,21 +599,11 @@ function launchArgs(permissionMode) {
 }
 
 function buildClaudeCommand(sessions, choice, options = {}) {
-  const normalized = String(choice || "").trim();
   const baseArgs = launchArgs(options.permissionMode || options.launchMode);
+  const session = resolveSessionChoice(sessions, choice);
 
-  if (normalized === "" || normalized === "0") {
-    return { command: "claude", args: baseArgs };
-  }
-
-  const selectedNumber = Number.parseInt(normalized, 10);
-  if (!Number.isInteger(selectedNumber) || String(selectedNumber) !== normalized) {
-    throw new Error(`Invalid choice: ${choice}`);
-  }
-
-  const session = sessions[selectedNumber - 1];
   if (!session) {
-    throw new Error(`Invalid choice: ${choice}`);
+    return { command: "claude", args: baseArgs };
   }
 
   return { command: "claude", args: [...baseArgs, "--resume", session.id] };

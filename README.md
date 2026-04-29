@@ -10,11 +10,12 @@ Interactive session pickers for Claude Code, Codex, and OpenCode. The existing C
 - List Codex sessions for the current directory.
 - List OpenCode sessions for the current directory.
 - Start a new session or resume an existing session.
-- Search sessions interactively.
+- Search sessions interactively with a fixed-column status line: `Permission`, `Matches`, and `Search`.
 - Navigate with arrow keys.
 - Show short session IDs, relative update time, message counts, first user message, and last user message.
 - Switch between permission modes.
 - Remember the last selected permission mode.
+- Use zero-based picker numbering: `0` creates a new session, `1` resumes the first existing match.
 - Browse existing Claude Code workspaces with the right arrow key.
 - Browse existing Codex sessions and workspaces with the same picker behavior.
 - Browse existing OpenCode sessions and workspaces with the same picker behavior.
@@ -86,6 +87,8 @@ Interactive controls:
 - Left arrow returns to the session list.
 - `Esc` or `Ctrl-C` cancels.
 
+Picker numbering starts at `0`: choose `0` or press Enter at the prompt to create a new session; choose `1` or above to resume an existing session.
+
 Permission modes:
 
 - Claude default: runs `claude`.
@@ -143,6 +146,13 @@ Options:
 - `session-utils.js`: shared config, JSONL, process launching, workspace filtering, and interactive picker helpers.
 - `*.test.js`: Node test files for provider behavior and installer behavior.
 - `install.sh` and `install.ps1`: installers for aliases/functions.
+
+## Design Notes
+
+- Claude, Codex, and OpenCode keep separate entry files so provider-specific storage and launch flags stay isolated.
+- Shared picker behavior lives in `session-utils.js` and the Claude renderer; Codex/OpenCode reuse it with provider-specific titles.
+- Permission modes are persisted per provider under each install config directory.
+- OpenCode full permission is passed through `OPENCODE_PERMISSION="allow"` because the OpenCode TUI does not support a matching command-line flag.
 
 ## Development
 

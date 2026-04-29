@@ -15,6 +15,7 @@ const {
   askQuestion,
   createSessionPicker,
   normalizePermissionMode,
+  resolveSessionChoice,
   runCommand,
 } = require("./session-utils");
 
@@ -198,23 +199,13 @@ function launchEnv(permissionMode) {
 }
 
 function buildOpenCodeCommand(sessions, choice, options = {}) {
-  const normalized = String(choice || "").trim();
   const permissionMode = options.permissionMode || options.launchMode;
   const baseArgs = launchArgs(permissionMode);
   const env = launchEnv(permissionMode);
+  const session = resolveSessionChoice(sessions, choice);
 
-  if (normalized === "" || normalized === "0") {
-    return { command: "opencode", args: baseArgs, ...(env ? { env } : {}) };
-  }
-
-  const selectedNumber = Number.parseInt(normalized, 10);
-  if (!Number.isInteger(selectedNumber) || String(selectedNumber) !== normalized) {
-    throw new Error(`Invalid choice: ${choice}`);
-  }
-
-  const session = sessions[selectedNumber - 1];
   if (!session) {
-    throw new Error(`Invalid choice: ${choice}`);
+    return { command: "opencode", args: baseArgs, ...(env ? { env } : {}) };
   }
 
   return { command: "opencode", args: [...baseArgs, "--session", session.id], ...(env ? { env } : {}) };

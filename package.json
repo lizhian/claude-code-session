@@ -1,7 +1,7 @@
 {
   "name": "claude-code-session",
   "version": "0.1.0",
-  "description": "Interactive Claude Code session picker",
+  "description": "Interactive session pickers for Claude Code, Codex, and OpenCode",
   "bin": {
     "claude-code-session": "./claude-sessions.js",
     "codex-code-session": "./codex-sessions.js",
@@ -14,7 +14,10 @@
   "keywords": [
     "claude",
     "claude-code",
+    "codex",
+    "opencode",
     "session",
+    "picker",
     "cli"
   ],
   "author": "lizhian",

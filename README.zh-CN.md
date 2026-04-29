@@ -10,11 +10,12 @@ Claude Code、Codex 与 OpenCode 的 session 交互式选择器。原有 Claude 
 - 列出当前目录的 Codex sessions。
 - 列出当前目录的 OpenCode sessions。
 - 新建 session 或恢复已有 session。
-- 支持交互式搜索。
+- 支持交互式搜索，并在同一行固定显示 `Permission`、`Matches` 和 `Search` 字段。
 - 支持上下方向键移动选择。
 - 显示短 session ID、相对更新时间、消息数量、首条 user 消息和最后一条 user 消息。
 - 支持 permission mode 切换。
 - 自动记住上次选择的权限模式。
+- 使用从 `0` 开始的编号：`0` 新建 session，`1` 恢复第一条已有匹配。
 - 右方向键进入 Claude Code 工作区选择模式。
 - 使用相同交互方式浏览 Codex sessions 和工作区。
 - 使用相同交互方式浏览 OpenCode sessions 和工作区。
@@ -90,6 +91,8 @@ oc
 - 左方向键返回 session 列表。
 - `Esc` 或 `Ctrl-C` 取消。
 
+选择器编号从 `0` 开始：选择 `0` 或在非交互提示里直接回车会创建新 session；选择 `1` 及以上会恢复已有 session。
+
 权限模式：
 
 - Claude default：执行 `claude`。
@@ -147,6 +150,13 @@ node opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home
 - `session-utils.js`：共享的配置、JSONL、进程启动、工作区过滤和交互式 picker 辅助逻辑。
 - `*.test.js`：基于 Node test 的 provider 行为和安装器行为测试。
 - `install.sh` 和 `install.ps1`：安装 alias/function 的脚本。
+
+## 设计说明
+
+- Claude、Codex 和 OpenCode 保持独立入口文件，避免不同 provider 的存储格式和启动参数互相影响。
+- 通用 picker 行为放在 `session-utils.js` 和 Claude 渲染逻辑中；Codex/OpenCode 复用该行为并替换 provider 标题。
+- permission mode 按 provider 分别持久化到各自的安装配置目录。
+- OpenCode full permission 通过 `OPENCODE_PERMISSION="allow"` 传入，因为 OpenCode TUI 当前没有对应的命令行 flag。
 
 ## 开发
 

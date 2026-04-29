@@ -137,6 +137,25 @@ function clampSelectedIndex(selectedIndex, itemCount) {
   return Math.min(Math.max(0, selectedIndex), itemCount - 1);
 }
 
+function resolveSessionChoice(sessions, choice) {
+  const normalized = String(choice || "").trim();
+  if (normalized === "" || normalized === "0") {
+    return null;
+  }
+
+  const selectedNumber = Number.parseInt(normalized, 10);
+  if (!Number.isInteger(selectedNumber) || String(selectedNumber) !== normalized) {
+    throw new Error(`Invalid choice: ${choice}`);
+  }
+
+  const session = sessions[selectedNumber - 1];
+  if (!session) {
+    throw new Error(`Invalid choice: ${choice}`);
+  }
+
+  return session;
+}
+
 function nextPermissionMode(permissionMode, permissionModes = DEFAULT_PERMISSION_MODES) {
   const modes = supportedPermissionModes(permissionModes);
   const normalized = normalizePermissionMode(permissionMode, modes);
@@ -414,6 +433,7 @@ module.exports = {
   normalizePermissionMode,
   nextPermissionMode,
   readJsonLines,
+  resolveSessionChoice,
   runCommand,
   saveLaunchMode,
   savePermissionMode,
