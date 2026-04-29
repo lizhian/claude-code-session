@@ -5,6 +5,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  DEFAULT_CONFIG_PATH,
   buildClaudeCommand,
   loadLaunchMode,
   displayWidth,
@@ -22,6 +23,10 @@ const {
   truncateToWidth,
   listSessions,
 } = require("./claude-sessions");
+
+test("stores default config under the install directory", () => {
+  assert.equal(DEFAULT_CONFIG_PATH, path.join(os.homedir(), ".claude-code-session", "config.json"));
+});
 
 test("encodes absolute paths the way Claude Code stores project directories", () => {
   assert.equal(encodeProjectPath("/Users/lizhian/临时"), "-Users-lizhian---");

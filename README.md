@@ -55,7 +55,7 @@ Launch modes:
 The selected launch mode is saved to:
 
 ```bash
-~/.config/claude-code-session/config.json
+~/.claude-code-session/config.json
 ```
 
 ## CLI

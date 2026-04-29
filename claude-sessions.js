@@ -6,7 +6,7 @@ const path = require("node:path");
 const readline = require("node:readline");
 const { spawn } = require("node:child_process");
 
-const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".config", "claude-code-session", "config.json");
+const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".claude-code-session", "config.json");
 const VALID_LAUNCH_MODES = new Set(["normal", "trust"]);
 
 function encodeProjectPath(cwd) {
@@ -1028,7 +1028,7 @@ function usage() {
     "",
     "获取指定目录对应的 Claude Code sessions。默认读取当前目录和 ~/.claude。",
     "交互模式快捷键：Tab 切换普通/信任启动模式，→ 选择 Claude Code 工作区，← 返回 session 列表。",
-    "启动模式会自动记住，配置保存在 ~/.config/claude-code-session/config.json。",
+    "启动模式会自动记住，配置保存在 ~/.claude-code-session/config.json。",
     "",
     "Options:",
     "  --json                 输出 JSON，方便 jq 或其他脚本处理",
@@ -1101,6 +1101,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  DEFAULT_CONFIG_PATH,
   buildClaudeCommand,
   displayWidth,
   encodeProjectPath,
