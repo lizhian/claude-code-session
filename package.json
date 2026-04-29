@@ -1,0 +1,20 @@
+{
+  "name": "claude-code-session",
+  "version": "0.1.0",
+  "description": "Interactive Claude Code session picker",
+  "bin": {
+    "claude-code-session": "./claude-sessions.js"
+  },
+  "scripts": {
+    "test": "node --test claude-sessions.test.js",
+    "check": "node --check claude-sessions.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "session",
+    "cli"
+  ],
+  "author": "lizhian",
+  "license": "MIT"
+}
