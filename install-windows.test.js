@@ -11,10 +11,12 @@ test("Windows installer contains required environment checks", () => {
 
   assert.match(script, /Get-Command node/);
   assert.match(script, /Get-Command claude/);
+  assert.doesNotMatch(script, /Fail "claude is required/);
   assert.match(script, /Get-Command codex/);
   assert.match(script, /Write-Warning "codex/);
   assert.match(script, /Get-Command opencode/);
   assert.match(script, /Write-Warning "opencode/);
+  assert.match(script, /No supported agent CLI found/);
   assert.match(script, /Get-Command sqlite3/);
   assert.match(script, /Write-Warning "sqlite3/);
   assert.match(script, /claude-sessions\.js/);
@@ -25,6 +27,17 @@ test("Windows installer contains required environment checks", () => {
   assert.match(script, /CodexUtilsScript/);
   assert.match(script, /OpenCodeSupportScript/);
   assert.match(script, /OpenCodeUtilsScript/);
+});
+
+test("Windows installer gates copies and functions by detected agents", () => {
+  const script = fs.readFileSync(installScript, "utf8");
+
+  assert.match(script, /\$HasClaude = \[bool\]\(Get-Command claude/);
+  assert.match(script, /\$HasCodex = \[bool\]\(Get-Command codex/);
+  assert.match(script, /\$HasOpenCode = \[bool\]\(Get-Command opencode/);
+  assert.match(script, /if \(\$HasClaude\)/);
+  assert.match(script, /if \(\$HasCodex\)/);
+  assert.match(script, /if \(\$HasOpenCode\)/);
 });
 
 test("Windows installer installs under the shared install directory", () => {

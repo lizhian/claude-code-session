@@ -9,8 +9,8 @@ This repository contains small Node.js CLIs for browsing Claude Code, Codex, and
 - `opencode-sessions.js`: OpenCode executable. It reads OpenCode's SQLite database through `sqlite3`.
 - `session-utils.js`: shared config, JSONL, command launching, workspace filtering, and interactive picker state helpers.
 - `claude-sessions.test.js`, `codex-sessions.test.js`, and `opencode-sessions.test.js`: unit tests for provider-specific parsing, formatting, config, picker behavior, and launch commands.
-- `install.sh`: macOS/Linux installer that copies all CLIs plus shared support files and adds `cc`, `cx`, and `oc` aliases.
-- `install.ps1`: Windows PowerShell installer that adds `cc`, `cx`, and `oc` functions.
+- `install.sh`: macOS/Linux installer that copies only detected agent CLIs plus shared support files and adds matching `cc`, `cx`, and/or `oc` aliases.
+- `install.ps1`: Windows PowerShell installer that adds matching `cc`, `cx`, and/or `oc` functions for detected agent CLIs.
 - `install.test.js` and `install-windows.test.js`: installer behavior and smoke tests.
 - `README.md` and `README.zh-CN.md`: user-facing documentation.
 - `package.json`: npm metadata, binary entries, and test/check scripts.
@@ -27,7 +27,7 @@ There are no separate `src/`, `test/`, or asset directories; keep new project fi
 - `node claude-sessions.js --pick`: opens the interactive picker locally.
 - `node codex-sessions.js --pick`: opens the Codex picker locally.
 - `node opencode-sessions.js --pick`: opens the OpenCode picker locally.
-- `./install.sh` or `.\install.ps1`: installs the CLI aliases/functions for manual verification.
+- `./install.sh` or `.\install.ps1`: installs aliases/functions only for agent CLIs currently found in `PATH`.
 
 ## Coding Style & Naming Conventions
 
@@ -35,7 +35,7 @@ Use CommonJS modules, two-space indentation, double quotes, and semicolons to ma
 
 ## Testing Guidelines
 
-Tests use `node:test` and `node:assert/strict`. Name tests after the behavior under test, for example `test("loads default permission mode when config is missing or invalid", ...)`. Keep tests co-located in root-level `*.test.js` files. Add coverage for CLI parsing, JSONL edge cases, SQLite session rows, config writes, permission-to-command mapping, zero-based picker choices, and installer idempotency when changing those areas.
+Tests use `node:test` and `node:assert/strict`. Name tests after the behavior under test, for example `test("loads default permission mode when config is missing or invalid", ...)`. Keep tests co-located in root-level `*.test.js` files. Add coverage for CLI parsing, JSONL edge cases, SQLite session rows, config writes, permission-to-command mapping, zero-based picker choices, installer idempotency, and conditional alias installation when changing those areas.
 
 ## Commit & Pull Request Guidelines
 

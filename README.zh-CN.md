@@ -27,6 +27,8 @@ Claude Code、Codex 与 OpenCode 的 session 交互式选择器。原有 Claude 
 - `cx` 需要 Codex CLI。
 - `oc` 需要 OpenCode CLI 和 `sqlite3`。
 
+安装脚本本身只强制要求 Node.js。安装别名前，请至少安装一个受支持的 agent CLI。
+
 ## 安装
 
 克隆仓库后运行安装脚本。
@@ -43,7 +45,7 @@ Windows PowerShell：
 .\install.ps1
 ```
 
-安装脚本会检查 `node` 和 `claude` 是否可用；如果 `codex`、`opencode` 或 `sqlite3` 不在 PATH 中会给出警告。OpenCode session 浏览会通过 `sqlite3` 读取 OpenCode 的 SQLite 数据库。脚本会把 Claude 选择器复制到 `~/.claude-code-session`，把 Codex 选择器复制到 `~/.codex-code-session`，把 OpenCode 选择器复制到 `~/.opencode-code-session`，在适用的平台设置可执行权限，并把 `cc`、`cx` 和 `oc` 添加到对应 shell profile。
+安装脚本会检查 `PATH` 中当前可用的 agent CLI，并且只安装对应的选择器脚本和 alias/function。例如只安装了 `codex` 时，只会安装 `cx`。如果 `claude`、`codex`、`opencode` 都不存在，安装会失败。OpenCode session 浏览会通过 `sqlite3` 读取 OpenCode 的 SQLite 数据库；如果已安装 `opencode` 但缺少 `sqlite3`，脚本会提示警告并继续安装 `oc`。
 
 安装后重新加载 shell 配置：
 

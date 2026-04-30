@@ -143,25 +143,57 @@ test("install script is idempotent and replaces the managed alias", () => {
   assert.match(bashrc, /# after/);
 });
 
-test("install script fails when Claude Code CLI is missing", () => {
-  const { result } = runInstall({ withClaude: false });
+test("install script installs only agents found in PATH", () => {
+  const { result, home } = runInstall({
+    withClaude: false,
+    withOpenCode: false,
+    shellRcName: ".zshrc",
+    shellRcContent: [
+      "# Claude Code session picker",
+      "alias cc='/old/path --pick --trust-current-folder'",
+      "# OpenCode session picker",
+      "alias oc='/old/opencode/path --pick --trust-current-folder'",
+      "",
+    ].join("\n"),
+  });
+  const installedScript = path.join(home, ".claude-code-session", "claude-sessions.js");
+  const installedCodexScript = path.join(home, ".codex-code-session", "codex-sessions.js");
+  const installedOpenCodeScript = path.join(home, ".opencode-code-session", "opencode-sessions.js");
+  const zshrc = fs.readFileSync(path.join(home, ".zshrc"), "utf8");
 
-  assert.notEqual(result.status, 0);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(fs.existsSync(installedScript), false);
+  assert.equal(fs.existsSync(installedCodexScript), true);
+  assert.equal(fs.existsSync(installedOpenCodeScript), false);
+  assert.doesNotMatch(zshrc, /# Claude Code session picker/);
+  assert.match(zshrc, /# Codex session picker/);
+  assert.doesNotMatch(zshrc, /# OpenCode session picker/);
+  assert.doesNotMatch(zshrc, /alias cc=/);
+  assert.match(zshrc, /alias cx=/);
+  assert.doesNotMatch(zshrc, /alias oc=/);
   assert.match(result.stderr, /claude/);
+  assert.match(result.stderr, /opencode/);
 });
 
-test("install script still installs aliases when Codex CLI is missing", () => {
+test("install script skips the Codex alias when Codex CLI is missing", () => {
   const { result } = runInstall({ withCodex: false });
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stderr, /codex/);
 });
 
-test("install script still installs aliases when OpenCode CLI is missing", () => {
+test("install script skips the OpenCode alias when OpenCode CLI is missing", () => {
   const { result } = runInstall({ withOpenCode: false });
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stderr, /opencode/);
+});
+
+test("install script fails when no supported agent CLI is found", () => {
+  const { result } = runInstall({ withClaude: false, withCodex: false, withOpenCode: false });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /claude, codex, or opencode/);
 });
 
 test("install script still installs aliases when sqlite3 is missing", () => {

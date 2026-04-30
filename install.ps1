@@ -9,20 +9,28 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
   Fail "node is required but was not found in PATH."
 }
 
-if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-  Fail "claude is required but was not found in PATH."
+$HasClaude = [bool](Get-Command claude -ErrorAction SilentlyContinue)
+$HasCodex = [bool](Get-Command codex -ErrorAction SilentlyContinue)
+$HasOpenCode = [bool](Get-Command opencode -ErrorAction SilentlyContinue)
+
+if (-not $HasClaude) {
+  Write-Warning "claude was not found in PATH. Skipping cc function."
 }
 
-if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
-  Write-Warning "codex was not found in PATH. The cx function is installed but requires Codex CLI."
+if (-not $HasCodex) {
+  Write-Warning "codex was not found in PATH. Skipping cx function."
 }
 
-if (-not (Get-Command opencode -ErrorAction SilentlyContinue)) {
-  Write-Warning "opencode was not found in PATH. The oc function is installed but requires OpenCode CLI."
+if (-not $HasOpenCode) {
+  Write-Warning "opencode was not found in PATH. Skipping oc function."
 }
 
-if (-not (Get-Command sqlite3 -ErrorAction SilentlyContinue)) {
-  Write-Warning "sqlite3 was not found in PATH. The oc function is installed but requires sqlite3 to read OpenCode sessions."
+if (-not ($HasClaude -or $HasCodex -or $HasOpenCode)) {
+  Fail "No supported agent CLI found in PATH. Install claude, codex, or opencode first."
+}
+
+if ($HasOpenCode -and -not (Get-Command sqlite3 -ErrorAction SilentlyContinue)) {
+  Write-Warning "sqlite3 was not found in PATH. The oc function requires sqlite3 to read OpenCode sessions."
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -50,25 +58,33 @@ if (-not (Test-Path $UtilsSourceScript)) {
   Fail "session-utils.js was not found next to install.ps1."
 }
 
-if (-not (Test-Path $CodexSourceScript)) {
+if ($HasCodex -and -not (Test-Path $CodexSourceScript)) {
   Fail "codex-sessions.js was not found next to install.ps1."
 }
 
-if (-not (Test-Path $OpenCodeSourceScript)) {
+if ($HasOpenCode -and -not (Test-Path $OpenCodeSourceScript)) {
   Fail "opencode-sessions.js was not found next to install.ps1."
 }
 
-New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-New-Item -ItemType Directory -Path $CodexInstallDir -Force | Out-Null
-New-Item -ItemType Directory -Path $OpenCodeInstallDir -Force | Out-Null
-Copy-Item -Path $SourceScript -Destination $InstalledScript -Force
-Copy-Item -Path $UtilsSourceScript -Destination $InstalledUtilsScript -Force
-Copy-Item -Path $CodexSourceScript -Destination $CodexInstalledScript -Force
-Copy-Item -Path $SourceScript -Destination $CodexSupportScript -Force
-Copy-Item -Path $UtilsSourceScript -Destination $CodexUtilsScript -Force
-Copy-Item -Path $OpenCodeSourceScript -Destination $OpenCodeInstalledScript -Force
-Copy-Item -Path $SourceScript -Destination $OpenCodeSupportScript -Force
-Copy-Item -Path $UtilsSourceScript -Destination $OpenCodeUtilsScript -Force
+if ($HasClaude) {
+  New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+  Copy-Item -Path $SourceScript -Destination $InstalledScript -Force
+  Copy-Item -Path $UtilsSourceScript -Destination $InstalledUtilsScript -Force
+}
+
+if ($HasCodex) {
+  New-Item -ItemType Directory -Path $CodexInstallDir -Force | Out-Null
+  Copy-Item -Path $CodexSourceScript -Destination $CodexInstalledScript -Force
+  Copy-Item -Path $SourceScript -Destination $CodexSupportScript -Force
+  Copy-Item -Path $UtilsSourceScript -Destination $CodexUtilsScript -Force
+}
+
+if ($HasOpenCode) {
+  New-Item -ItemType Directory -Path $OpenCodeInstallDir -Force | Out-Null
+  Copy-Item -Path $OpenCodeSourceScript -Destination $OpenCodeInstalledScript -Force
+  Copy-Item -Path $SourceScript -Destination $OpenCodeSupportScript -Force
+  Copy-Item -Path $UtilsSourceScript -Destination $OpenCodeUtilsScript -Force
+}
 
 $ProfilePath = $PROFILE.CurrentUserAllHosts
 $ProfileDir = Split-Path -Parent $ProfilePath
@@ -126,13 +142,33 @@ $UpdatedProfile = [regex]::Replace($UpdatedProfile, $OpenCodePattern, "")
 if ($UpdatedProfile.Length -gt 0 -and -not $UpdatedProfile.EndsWith("`n")) {
   $UpdatedProfile += "`n"
 }
-$UpdatedProfile += "`n$AliasBlock`n`n$CodexAliasBlock`n`n$OpenCodeAliasBlock`n"
+$ProfileBlocks = @()
+if ($HasClaude) {
+  $ProfileBlocks += $AliasBlock
+}
+if ($HasCodex) {
+  $ProfileBlocks += $CodexAliasBlock
+}
+if ($HasOpenCode) {
+  $ProfileBlocks += $OpenCodeAliasBlock
+}
+$UpdatedProfile += "`n$($ProfileBlocks -join "`n`n")`n"
 Set-Content -Path $ProfilePath -Value $UpdatedProfile -Encoding UTF8
 
-Write-Host "Installed claude-sessions.js to $InstalledScript"
-Write-Host "Installed codex-sessions.js to $CodexInstalledScript"
-Write-Host "Installed opencode-sessions.js to $OpenCodeInstalledScript"
-Write-Host "Added cc function to $ProfilePath"
-Write-Host "Added cx function to $ProfilePath"
-Write-Host "Added oc function to $ProfilePath"
-Write-Host "Restart PowerShell or run: . `$PROFILE"
+$AvailableAliases = @()
+if ($HasClaude) {
+  Write-Host "Installed claude-sessions.js to $InstalledScript"
+  Write-Host "Added cc function to $ProfilePath"
+  $AvailableAliases += "cc"
+}
+if ($HasCodex) {
+  Write-Host "Installed codex-sessions.js to $CodexInstalledScript"
+  Write-Host "Added cx function to $ProfilePath"
+  $AvailableAliases += "cx"
+}
+if ($HasOpenCode) {
+  Write-Host "Installed opencode-sessions.js to $OpenCodeInstalledScript"
+  Write-Host "Added oc function to $ProfilePath"
+  $AvailableAliases += "oc"
+}
+Write-Host "Restart PowerShell or run: . `$PROFILE. Then use: $($AvailableAliases -join ', ')"

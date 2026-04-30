@@ -27,6 +27,8 @@ Interactive session pickers for Claude Code, Codex, and OpenCode. The existing C
 - Codex CLI for `cx`.
 - OpenCode CLI and `sqlite3` for `oc`.
 
+Only Node.js is required to run the installer. Install at least one supported agent CLI before installing aliases.
+
 ## Install
 
 Clone the repository, then run the installer.
@@ -43,7 +45,7 @@ Windows PowerShell:
 .\install.ps1
 ```
 
-The installer checks that `node` and `claude` are available, and warns if `codex`, `opencode`, or `sqlite3` is missing. OpenCode session browsing reads OpenCode's SQLite database through `sqlite3`. The installer copies the Claude picker to `~/.claude-code-session`, the Codex picker to `~/.codex-code-session`, and the OpenCode picker to `~/.opencode-code-session`, makes them executable where applicable, and adds `cc`, `cx`, and `oc` to your shell profile.
+The installer checks which supported agent CLIs are available in `PATH`, then installs only the matching picker scripts and aliases/functions. For example, if only `codex` is installed, it installs only `cx`. If none of `claude`, `codex`, or `opencode` is found, installation fails. OpenCode session browsing reads OpenCode's SQLite database through `sqlite3`; if `opencode` is installed but `sqlite3` is missing, the installer warns and still installs `oc`.
 
 After installing, reload your shell:
 
