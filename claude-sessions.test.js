@@ -15,6 +15,7 @@ const {
   formatPicker,
   formatSessionTime,
   formatSessions,
+  loadSessionTranscript,
   listWorkspaces,
   markProjectTrusted,
   renderInteractivePicker,
@@ -24,6 +25,7 @@ const {
   listSessions,
 } = require("./claude/claude-sessions");
 const { createSessionPicker } = require("./common/session-utils");
+const { normalizeTranscriptMessages } = require("./common/session-transcript");
 
 test("stores default config under the install directory", () => {
   assert.equal(DEFAULT_CONFIG_PATH, path.join(os.homedir(), ".agent-session", "claude-code.json"));
@@ -87,6 +89,36 @@ test("lists sessions for a cwd from Claude Code jsonl files", () => {
   assert.equal(sessions[0].startedAt, "2026-04-29T00:00:00.000Z");
   assert.equal(sessions[0].updatedAt, "2026-04-29T00:00:10.000Z");
   assert.equal(sessions[0].projectDir, projectDir);
+});
+
+test("loads full Claude transcript text from a session file", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-transcript-"));
+  const sessionFile = path.join(tempDir, "session.jsonl");
+  fs.writeFileSync(
+    sessionFile,
+    [
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-04-29T00:00:00.000Z",
+        message: { role: "user", content: "first prompt" },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        timestamp: "2026-04-29T00:00:05.000Z",
+        message: { role: "assistant", content: [{ type: "text", text: "assistant reply" }] },
+      }),
+      JSON.stringify({
+        type: "user",
+        timestamp: "2026-04-29T00:00:10.000Z",
+        message: { role: "user", content: "last prompt" },
+      }),
+    ].join("\n"),
+  );
+
+  assert.deepEqual(loadSessionTranscript({ file: sessionFile }).messages, [
+    { role: "user", timestamp: "2026-04-29T00:00:00.000Z", text: "first prompt", ordinal: 1 },
+    { role: "user", timestamp: "2026-04-29T00:00:10.000Z", text: "last prompt", ordinal: 2 },
+  ]);
 });
 
 test("returns an empty list when the current directory has no sessions", () => {
@@ -224,7 +256,8 @@ test("formats relative times for the picker", () => {
   assert.equal(formatSessionTime("2026-04-29T11:59:00.000Z", now), "1分钟前");
   assert.equal(formatSessionTime("2026-04-29T09:00:00.000Z", now), "3小时前");
   assert.equal(formatSessionTime("2026-04-28T12:00:00.000Z", now), "1天前");
-  assert.equal(formatSessionTime("2026-04-25T12:00:00.000Z", now), "2026-04-25");
+  assert.equal(formatSessionTime("2026-04-23T12:00:00.000Z", now), "6天前");
+  assert.equal(formatSessionTime("2026-04-21T12:00:00.000Z", now), "2026-04-21");
 });
 
 test("filters sessions by id, prompt, branch, and cwd", () => {
@@ -309,7 +342,7 @@ test("renders only the picker title when new session is selected", () => {
   assert.doesNotMatch(output.split("\n")[0], /Session:/);
 });
 
-test("renders selected session summary preview", () => {
+test("renders selected session transcript preview", () => {
   const output = renderInteractivePicker({
     sessions: [
       {
@@ -334,6 +367,18 @@ test("renders selected session summary preview", () => {
       firstUserMessage: "first prompt",
       lastUserMessage: "last prompt",
     },
+    previewTranscript: {
+      messages: [
+        { role: "user", timestamp: "2026-04-29T00:00:00", text: "first prompt\nsecond line", ordinal: 1 },
+        { role: "user", timestamp: "2026-04-29T00:00:05", text: "last prompt", ordinal: 2 },
+      ],
+      truncated: false,
+      totalMessages: 2,
+      messageLimit: 100,
+      headCount: 20,
+      tailCount: 80,
+    },
+    now: new Date("2026-05-08T00:00:00"),
     cwd: "/tmp/payment-api",
     rows: 20,
     columns: 100,
@@ -342,10 +387,100 @@ test("renders selected session summary preview", () => {
   assert.match(output, /^Claude Code sessions  11111111-2222-3333-4444-555555555555$/m);
   assert.match(output, /Messages: 2  Started: 2026-04-29T00:00:00.000Z  Updated: 2026-04-29T00:00:05.000Z/);
   assert.match(output, /Version: 2.1.83  Branch: main/);
-  assert.match(output, /First user message:/);
-  assert.match(output, /first prompt/);
-  assert.match(output, /Last user message:/);
-  assert.match(output, /last prompt/);
+  assert.match(output, /Transcript: 2 user messages/);
+  assert.match(output, /#1 2026-04-29 00:00:00/);
+  assert.match(output, /^first prompt$/m);
+  assert.match(output, /^second line$/m);
+  assert.doesNotMatch(output, /    first prompt/);
+  assert.doesNotMatch(output, /    second line/);
+  assert.match(output, /#2 2026-04-29 00:00:05/);
+  assert.match(output, /^last prompt$/m);
+  assert.doesNotMatch(output, /Assistant:/);
+});
+
+test("colors only transcript metadata when color is enabled", () => {
+  const output = renderInteractivePicker({
+    sessions: [],
+    selectedIndex: 1,
+    previewSession: {
+      id: "11111111-2222-3333-4444-555555555555",
+      messageCount: 1,
+    },
+    previewTranscript: {
+      messages: [{ role: "user", timestamp: "2026-04-29T00:00:00", text: "first prompt", ordinal: 1 }],
+      totalMessages: 1,
+      truncated: false,
+      messageLimit: 100,
+      headCount: 20,
+      tailCount: 80,
+    },
+    now: new Date("2026-05-08T00:00:00"),
+    cwd: "/tmp/payment-api",
+    columns: 100,
+    color: true,
+  });
+
+  assert.match(output, /\x1b\[36m#1 2026-04-29 00:00:00\x1b\[0m/);
+  assert.match(output, /^first prompt$/m);
+  assert.doesNotMatch(output, /\x1b\[[0-9;]*mfirst prompt/);
+});
+
+test("limits transcript previews to the first 20 and last 80 user messages", () => {
+  const transcript = normalizeTranscriptMessages(
+    Array.from({ length: 120 }, (_, index) => ({
+      role: "user",
+      timestamp: "2026-04-29T00:00:00",
+      text: `prompt ${index + 1}`,
+    })),
+  );
+  const output = renderInteractivePicker({
+    sessions: [],
+    selectedIndex: 1,
+    previewSession: {
+      id: "11111111-2222-3333-4444-555555555555",
+      messageCount: 120,
+    },
+    previewTranscript: transcript,
+    now: new Date("2026-05-08T00:00:00"),
+    cwd: "/tmp/payment-api",
+    rows: 20,
+    columns: 100,
+  });
+
+  assert.equal(transcript.messages.length, 100);
+  assert.equal(transcript.totalMessages, 120);
+  assert.equal(transcript.skippedCount, 20);
+  assert.equal(transcript.messages[19].ordinal, 20);
+  assert.equal(transcript.messages[20].ordinal, 41);
+  assert.match(output, /Transcript: 120 user messages/);
+  assert.match(output, /\.\.\. skipped 20 user messages \.\.\./);
+  assert.match(output, /#1 2026-04-29 00:00:00/);
+  assert.match(output, /^prompt 1$/m);
+  assert.doesNotMatch(output, /^prompt 21$/m);
+  assert.match(output, /#120 2026-04-29 00:00:00/);
+});
+
+test("renders transcript preview errors without leaving the picker", () => {
+  const output = renderInteractivePicker({
+    sessions: [
+      {
+        id: "11111111-2222-3333-4444-555555555555",
+        messageCount: 2,
+      },
+    ],
+    selectedIndex: 1,
+    previewSession: {
+      id: "11111111-2222-3333-4444-555555555555",
+      messageCount: 2,
+    },
+    previewError: "missing session file",
+    cwd: "/tmp/payment-api",
+    rows: 20,
+    columns: 100,
+  });
+
+  assert.match(output, /Failed to load transcript:/);
+  assert.match(output, /missing session file/);
 });
 
 test("space previews selected sessions and escape returns to the session list", async () => {
@@ -378,6 +513,17 @@ test("space previews selected sessions and escape returns to the session list", 
     filterSessions,
     renderInteractivePicker,
     renderWorkspacePicker,
+    loadSessionTranscript: () => ({
+      messages: [
+        { role: "user", text: "first prompt", ordinal: 1 },
+        { role: "user", text: "last prompt", ordinal: 2 },
+      ],
+      truncated: false,
+      totalMessages: 2,
+      messageLimit: 100,
+      headCount: 20,
+      tailCount: 80,
+    }),
     workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
   });
   const picked = picker(sessions, {
@@ -392,7 +538,8 @@ test("space previews selected sessions and escape returns to the session list", 
   await new Promise((resolve) => setImmediate(resolve));
   input.emit("keypress", " ", { name: "space" });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.match(rendered, /First user message:/);
+  assert.match(rendered, /Transcript: 2 user messages/);
+  assert.doesNotMatch(rendered, /Assistant:/);
   assert.match(rendered, /last prompt/);
 
   rendered = "";
@@ -405,6 +552,76 @@ test("space previews selected sessions and escape returns to the session list", 
   const result = await picked;
   assert.equal(result.item.type, "session");
   assert.equal(result.item.session.id, "11111111-2222-3333-4444-555555555555");
+});
+
+test("preview rendering clears scrollback so previous session messages are removed", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let rendered = "";
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+  output.on("data", (chunk) => {
+    rendered += chunk.toString("utf8");
+  });
+
+  const sessions = [
+    { id: "11111111-2222-3333-4444-555555555555", messageCount: 1 },
+    { id: "22222222-3333-4444-5555-666666666666", messageCount: 1 },
+  ];
+  const picker = createSessionPicker({
+    configPath: path.join(os.tmpdir(), "agent-session-preview-clear-test.json"),
+    defaultHome: () => os.tmpdir(),
+    homeOptionName: "claudeHome",
+    listSessions: () => sessions,
+    listWorkspaces: () => [],
+    filterSessions,
+    renderInteractivePicker,
+    renderWorkspacePicker,
+    loadSessionTranscript: (session) => ({
+      messages: [{ role: "user", text: `prompt for ${session.id}`, ordinal: 1 }],
+      truncated: false,
+      totalMessages: 1,
+      messageLimit: 100,
+      headCount: 20,
+      tailCount: 80,
+    }),
+    workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
+  });
+  const picked = picker(sessions, {
+    input,
+    output,
+    cwd: "/tmp/payment-api",
+    claudeHome: os.tmpdir(),
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "down" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", " ", { name: "space" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(rendered, /\x1b\[3J\x1b\[2J\x1b\[H/);
+  assert.match(rendered, /prompt for 11111111-2222-3333-4444-555555555555/);
+
+  rendered = "";
+  input.emit("keypress", "", { name: "escape" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "down" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", " ", { name: "space" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.match(rendered, /\x1b\[3J\x1b\[2J\x1b\[H/);
+  assert.match(rendered, /prompt for 22222222-3333-4444-5555-666666666666/);
+  assert.doesNotMatch(rendered, /prompt for 11111111-2222-3333-4444-555555555555/);
+
+  input.emit("keypress", "", { name: "escape" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "escape" });
+  const result = await picked;
+  assert.equal(result, null);
 });
 
 test("renders picker status fields in fixed columns", () => {
@@ -470,7 +687,7 @@ test("renders picker rows with aligned columns and width-limited prompts", () =>
     rows: 20,
     columns: 72,
   });
-  const lines = output.split("\n").filter((line) => /\d\.\s+(1分钟前|2026-04-25)/.test(line));
+  const lines = output.split("\n").filter((line) => /\d\.\s+(1分钟前|4天前)/.test(line));
   function nthIndexOf(value, search, occurrence) {
     let fromIndex = 0;
     for (let index = 1; index <= occurrence; index += 1) {
@@ -580,7 +797,7 @@ test("renders searchable workspace picker", () => {
   assert.doesNotMatch(output, /Enter choose/);
   assert.doesNotMatch(output, /← sessions/);
   assert.doesNotMatch(output, /Esc cancel/);
-  assert.match(output, /> 0\. 2026-04-25  1000 sessions/);
+  assert.match(output, /> 0\. 4天前\s+1000 sessions/);
   assert.match(output, /second-workspace/);
   assert.ok(output.split("\n").every((line) => displayWidth(line) <= 64));
 });

@@ -7,6 +7,7 @@ const test = require("node:test");
 const {
   DEFAULT_CONFIG_PATH,
   buildCodexCommand,
+  loadSessionTranscript,
   listSessions,
   listWorkspaces,
   markProjectTrusted,
@@ -75,6 +76,40 @@ test("lists sessions for a cwd from Codex jsonl files", () => {
   assert.equal(sessions[0].startedAt, "2026-04-29T14:56:25.542Z");
   assert.equal(sessions[0].updatedAt, "2026-04-29T15:00:00.000Z");
   assert.equal(sessions[0].file, sessionFile);
+});
+
+test("loads full Codex transcript text from a session file", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-transcript-"));
+  const sessionFile = path.join(tempDir, "session.jsonl");
+  fs.writeFileSync(
+    sessionFile,
+    [
+      JSON.stringify({
+        timestamp: "2026-04-29T14:56:25.542Z",
+        type: "event_msg",
+        payload: { type: "user_message", message: "first prompt" },
+      }),
+      JSON.stringify({
+        timestamp: "2026-04-29T14:57:25.542Z",
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "assistant",
+          content: [{ type: "output_text", text: "assistant reply" }],
+        },
+      }),
+      JSON.stringify({
+        timestamp: "2026-04-29T15:00:00.000Z",
+        type: "event_msg",
+        payload: { type: "user_message", message: "last prompt" },
+      }),
+    ].join("\n"),
+  );
+
+  assert.deepEqual(loadSessionTranscript({ file: sessionFile }).messages, [
+    { role: "user", timestamp: "2026-04-29T14:56:25.542Z", text: "first prompt", ordinal: 1 },
+    { role: "user", timestamp: "2026-04-29T15:00:00.000Z", text: "last prompt", ordinal: 2 },
+  ]);
 });
 
 test("lists Codex workspaces grouped by cwd", () => {

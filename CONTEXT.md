@@ -25,8 +25,12 @@ A **Common support module** that formats session lists, workspace lists, and int
 _Avoid_: Claude renderer
 
 **Session preview**:
-A temporary picker view for reading the selected session's summary messages before reopening it.
-_Avoid_: Full transcript browser
+A temporary picker view for reading the selected session's user-message transcript before reopening it.
+_Avoid_: Editor-like transcript browser
+
+**Session transcript**:
+Provider-loaded chronological user messages for one session.
+_Avoid_: Session summary
 
 **Source layout**:
 The repository directory structure that separates **Provider CLIs** into provider folders and shared scripts into `common/`.
@@ -43,7 +47,9 @@ _Avoid_: Flattened install files
 - A **Common support module** may be used by multiple **Provider CLIs**.
 - **Provider CLIs** keep provider-specific behavior separate from **Common support modules**.
 - A **Session renderer** may be used by any **Provider CLI**.
-- A **Session preview** belongs to the session picker and uses already-loaded session summary data.
+- A **Session preview** belongs to the session picker and loads a **Session transcript** lazily.
+- **Provider CLIs** own **Session transcript** loading because session storage differs by **Agent provider**.
+- A **Session renderer** owns **Session transcript** display; terminal scrollback owns long-preview scrolling.
 - The **Install layout** mirrors the **Source layout** so relative imports stay the same after installation.
 - Tests may remain at the repository root while importing provider modules from the **Source layout**.
 
@@ -58,12 +64,16 @@ _Avoid_: Flattened install files
 > **Dev:** "Should installed files be flattened into one directory?"
 > **Domain expert:** "No. The **Install layout** mirrors the **Source layout** so `common/`, `claude/`, `codex/`, and `opencode/` exist in both places."
 
-> **Dev:** "Does pressing Space open a full transcript?"
-> **Domain expert:** "No. Space opens a **Session preview** using the first and last user messages already present in the session summary."
+> **Dev:** "Does pressing Space load every session transcript upfront?"
+> **Domain expert:** "No. Space opens a **Session preview** and lazily loads the selected session's **Session transcript**."
+
+> **Dev:** "Should the **Session preview** show assistant replies too?"
+> **Domain expert:** "No. A **Session transcript** is a user-message view; assistant replies are intentionally excluded."
 
 ## Flagged ambiguities
 
 - "agent file" is resolved as **Provider CLI** when it refers to the Claude, Codex, or OpenCode executable module.
 - "Claude renderer" is resolved as **Session renderer** once the formatting logic is shared by Codex and OpenCode.
 - "root files" is resolved as the legacy layout where Provider CLIs lived at the repository root; the resolved **Source layout** no longer keeps root Provider CLI files.
-- "preview messages" is resolved as **Session preview**, not a full provider-specific transcript reader.
+- "preview messages" is resolved as **Session preview** backed by a lazily-loaded **Session transcript**, not the already-loaded session summary.
+- "complete conversation messages" is resolved as complete user messages inside the **Session transcript**, not assistant replies.

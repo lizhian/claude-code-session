@@ -8,6 +8,7 @@ const test = require("node:test");
 const {
   DEFAULT_CONFIG_PATH,
   buildOpenCodeCommand,
+  loadSessionTranscript,
   listSessions,
   listWorkspaces,
   parseArgs,
@@ -85,6 +86,37 @@ test("lists sessions for a cwd from OpenCode sqlite data", () => {
   assert.equal(sessions[0].startedAt, "2026-04-27T12:34:53.359Z");
   assert.equal(sessions[0].updatedAt, "2026-04-27T12:36:33.359Z");
   assert.equal(sessions[0].version, "1.14.28");
+});
+
+test("loads full OpenCode transcript text from sqlite data", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-transcript-"));
+  const dataHome = path.join(tempDir, "opencode");
+  const dbPath = path.join(dataHome, "opencode.db");
+  const cwd = path.join(tempDir, "demo project");
+
+  createOpenCodeDb(dbPath);
+  insertSession(dbPath, {
+    id: "ses_demo_1",
+    projectId: "project_demo",
+    cwd,
+    title: "Demo OpenCode session",
+    startedAt: 1777293293359,
+    updatedAt: 1777293393359,
+    firstPrompt: "first prompt",
+    lastPrompt: "last prompt",
+  });
+  sqlite(
+    dbPath,
+    [
+      "insert into message (id, session_id, time_created, time_updated, data) values ('ses_demo_1_msg_assistant', 'ses_demo_1', 1777293293365, 1777293293365, '{\"role\":\"assistant\"}');",
+      "insert into part (id, message_id, session_id, time_created, time_updated, data) values ('ses_demo_1_part_assistant', 'ses_demo_1_msg_assistant', 'ses_demo_1', 1777293293365, 1777293293365, '{\"type\":\"text\",\"text\":\"assistant reply\"}');",
+    ].join(" "),
+  );
+
+  assert.deepEqual(loadSessionTranscript({ id: "ses_demo_1", file: dbPath }).messages, [
+    { role: "user", timestamp: "2026-04-27T12:34:53.360Z", text: "first prompt", ordinal: 1 },
+    { role: "user", timestamp: "2026-04-27T12:36:33.359Z", text: "last prompt", ordinal: 2 },
+  ]);
 });
 
 test("lists OpenCode workspaces grouped by directory", () => {

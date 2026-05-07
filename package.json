@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "node --test claude-sessions.test.js codex-sessions.test.js opencode-sessions.test.js install.test.js install-windows.test.js",
-    "check": "node --check claude/claude-sessions.js && node --check codex/codex-sessions.js && node --check opencode/opencode-sessions.js && node --check common/session-utils.js && node --check common/session-renderer.js && bash -n install.sh"
+    "check": "node --check claude/claude-sessions.js && node --check codex/codex-sessions.js && node --check opencode/opencode-sessions.js && node --check common/session-utils.js && node --check common/session-renderer.js && node --check common/session-transcript.js && bash -n install.sh"
   },
   "keywords": [
     "claude",

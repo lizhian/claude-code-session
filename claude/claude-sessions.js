@@ -14,6 +14,7 @@ const {
   runCommand,
   savePermissionMode: savePermissionModeToConfig,
 } = require("../common/session-utils");
+const { normalizeTranscriptMessages } = require("../common/session-transcript");
 const {
   displayWidth,
   filterSessions,
@@ -104,6 +105,34 @@ function promptTextFromRecord(record) {
     })
     .filter(Boolean)
     .join(" ");
+}
+
+function transcriptMessageFromRecord(record) {
+  const message = record && record.message && typeof record.message === "object" ? record.message : {};
+  const role = message.role || (record.type === "user" || record.type === "assistant" ? record.type : "");
+  if (!role) {
+    return null;
+  }
+
+  const text = textFromContent(message.content);
+  if (!text) {
+    return null;
+  }
+
+  return {
+    role,
+    timestamp: record.timestamp || "",
+    text,
+  };
+}
+
+function loadSessionTranscript(session) {
+  if (!session || !session.file) {
+    return normalizeTranscriptMessages([]);
+  }
+
+  const { records } = readJsonLines(session.file);
+  return normalizeTranscriptMessages(records.map(transcriptMessageFromRecord).filter(Boolean));
 }
 
 function summarizeSession(file, projectDir) {
@@ -272,6 +301,7 @@ const pickSessionInteractive = createSessionPicker({
   renderInteractivePicker,
   renderWorkspacePicker,
   workspaceCwd: (workspace, currentCwd) => workspace.cwd || workspace.projectDir || currentCwd,
+  loadSessionTranscript,
 });
 
 async function pickAndRunClaude(sessions, options = {}) {
@@ -444,6 +474,7 @@ module.exports = {
   loadPermissionMode,
   listSessions,
   listWorkspaces,
+  loadSessionTranscript,
   markProjectTrusted,
   parseArgs,
   promptTextFromRecord,

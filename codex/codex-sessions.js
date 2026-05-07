@@ -20,6 +20,7 @@ const {
   resolveSessionChoice,
   runCommand,
 } = require("../common/session-utils");
+const { normalizeTranscriptMessages } = require("../common/session-transcript");
 
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-session", "codex.json");
 
@@ -87,6 +88,36 @@ function promptTextFromRecord(record) {
   return "";
 }
 
+function transcriptMessageFromRecord(record) {
+  const payload = record && record.payload && typeof record.payload === "object" ? record.payload : {};
+
+  if (record.type === "event_msg" && payload.type === "user_message") {
+    return {
+      role: "user",
+      timestamp: recordTimestamp(record),
+      text: textFromContent(payload.message || payload.content || payload.text),
+    };
+  }
+
+  if (record.type === "event_msg" && payload.type === "agent_message") {
+    return {
+      role: "assistant",
+      timestamp: recordTimestamp(record),
+      text: textFromContent(payload.message || payload.content || payload.text),
+    };
+  }
+
+  if (record.type === "response_item" && payload.type === "message") {
+    return {
+      role: payload.role || "message",
+      timestamp: recordTimestamp(record),
+      text: textFromContent(payload.content),
+    };
+  }
+
+  return null;
+}
+
 function recordTimestamp(record) {
   if (typeof record.timestamp === "string" && record.timestamp.length > 0) {
     return record.timestamp;
@@ -147,6 +178,15 @@ function summarizeSession(file) {
     firstUserMessage: userMessages[0] || "",
     lastUserMessage: userMessages[userMessages.length - 1] || "",
   };
+}
+
+function loadSessionTranscript(session) {
+  if (!session || !session.file) {
+    return normalizeTranscriptMessages([]);
+  }
+
+  const { records } = readJsonLines(session.file);
+  return normalizeTranscriptMessages(records.map(transcriptMessageFromRecord).filter(Boolean));
 }
 
 function defaultCodexHome() {
@@ -287,6 +327,7 @@ const pickSessionInteractive = createSessionPicker({
   renderInteractivePicker,
   renderWorkspacePicker,
   workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
+  loadSessionTranscript,
 });
 
 async function pickAndRunCodex(sessions, options = {}) {
@@ -449,6 +490,7 @@ module.exports = {
   formatSessions,
   listSessions,
   listWorkspaces,
+  loadSessionTranscript,
   markProjectTrusted,
   parseArgs,
   pickAndRunCodex,

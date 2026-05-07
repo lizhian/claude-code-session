@@ -4,6 +4,15 @@ const {
   workspaceItems,
 } = require("./session-utils");
 
+const ANSI = {
+  reset: "\x1b[0m",
+  previewMeta: "\x1b[36m",
+};
+
+function colorize(value, color, enabled) {
+  return enabled ? `${color}${value}${ANSI.reset}` : value;
+}
+
 function truncate(value, maxLength) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   if (text.length <= maxLength) {
@@ -109,6 +118,13 @@ function formatDate(date) {
   return `${year}-${month}-${day}`;
 }
 
+function formatDateTime(date) {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${formatDate(date)} ${hours}:${minutes}:${seconds}`;
+}
+
 function formatSessionTime(timestamp, now = new Date()) {
   if (!timestamp) {
     return "-";
@@ -133,10 +149,28 @@ function formatSessionTime(timestamp, now = new Date()) {
   if (diffMs < dayMs) {
     return `${Math.floor(diffMs / hourMs)}小时前`;
   }
-  if (diffMs <= 3 * dayMs) {
+  if (diffMs < 7 * dayMs) {
     return `${Math.floor(diffMs / dayMs)}天前`;
   }
   return formatDate(date);
+}
+
+function formatPreviewMessageTime(timestamp, now = new Date()) {
+  if (!timestamp) {
+    return "-";
+  }
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
+  const dayMs = 24 * 60 * 60 * 1000;
+  if (diffMs < 7 * dayMs) {
+    return formatSessionTime(timestamp, now);
+  }
+  return formatDateTime(date);
 }
 
 function sessionSearchText(session) {
@@ -275,6 +309,52 @@ function wrapToWidth(value, width) {
   return lines.length > 0 ? lines : ["-"];
 }
 
+function wrapRawLineToWidth(value, width, firstWidth = width) {
+  const text = String(value || "");
+  if (!text) {
+    return [""];
+  }
+  if (displayWidth(text) <= firstWidth) {
+    return [text];
+  }
+  if (firstWidth <= 1 || width <= 1) {
+    return [truncateToWidth(text, firstWidth)];
+  }
+
+  const lines = [];
+  let line = "";
+  let lineWidth = 0;
+  let currentWidth = firstWidth;
+
+  for (const char of text) {
+    const nextWidth = charWidth(char);
+    if (line && lineWidth + nextWidth > currentWidth) {
+      lines.push(line);
+      line = "";
+      lineWidth = 0;
+      currentWidth = width;
+    }
+    line += char;
+    lineWidth += nextWidth;
+  }
+
+  if (line) {
+    lines.push(line);
+  }
+  return lines.length > 0 ? lines : [""];
+}
+
+function wrapTranscriptText(value, width, firstWidth = width) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return ["-"];
+  }
+
+  return text
+    .split(/\r?\n/)
+    .flatMap((line, index) => wrapRawLineToWidth(line, width, index === 0 ? firstWidth : width));
+}
+
 function pickerItems(sessions, query) {
   return [
     { type: "new", label: "new" },
@@ -317,12 +397,15 @@ function renderSessionPreview(options) {
   const permissionMode = normalizePermissionMode(options.permissionMode || options.launchMode, options.permissionModes);
   const cwd = options.cwd || process.cwd();
   const columns = options.columns || process.stdout.columns || 100;
-  const rows = options.rows || process.stdout.rows || 24;
-  const lines = [
+  const now = options.now || new Date();
+  const useColor = options.color === true;
+  const header = [
     fitLine(`${title}  ${session.id}`, columns),
     fitLine(`Workspace: ${cwd}`, columns),
     fitLine(pickerStatusLine(permissionMode, options.filteredCount || 0, options.query || "", options.permissionModes), columns),
     "",
+  ];
+  const body = [
     fitLine(`Messages: ${session.messageCount || 0}  Started: ${session.startedAt || "-"}  Updated: ${session.updatedAt || "-"}`, columns),
   ];
 
@@ -334,21 +417,50 @@ function renderSessionPreview(options) {
     details.push(`Branch: ${session.gitBranch}`);
   }
   if (details.length > 0) {
-    lines.push(fitLine(details.join("  "), columns));
+    body.push(fitLine(details.join("  "), columns));
   }
 
-  function appendMessage(label, value) {
-    lines.push("");
-    lines.push(fitLine(label, columns));
+  function appendWrapped(label, value) {
+    body.push("");
+    body.push(fitLine(label, columns));
     for (const line of wrapToWidth(value || "-", columns)) {
-      lines.push(fitLine(line, columns));
+      body.push(fitLine(line, columns));
     }
   }
 
-  appendMessage("First user message:", displayFirstUserMessage(session) || "-");
-  appendMessage("Last user message:", displayLastUserMessage(session) || "-");
+  if (options.previewError) {
+    appendWrapped("Failed to load transcript:", options.previewError);
+  } else if (options.previewTranscript && Array.isArray(options.previewTranscript.messages)) {
+    const transcript = options.previewTranscript;
+    const totalMessages = transcript.totalMessages ?? transcript.messages.length;
+    body.push("");
+    body.push(fitLine(`Transcript: ${totalMessages} user messages`, columns));
+    for (const [index, message] of transcript.messages.entries()) {
+      if (transcript.truncated && index === transcript.headCount) {
+        body.push("");
+        body.push(fitLine(`... skipped ${transcript.skippedCount} user messages ...`, columns));
+      }
+      body.push("");
+      const ordinal = message.ordinal || index + 1;
+      body.push(
+        fitLine(
+          colorize(`#${ordinal} ${formatPreviewMessageTime(message.timestamp, now)}`, ANSI.previewMeta, useColor),
+          columns,
+        ),
+      );
+      for (const line of wrapTranscriptText(message.text || "-", columns)) {
+        body.push(fitLine(line, columns));
+      }
+    }
+    if (transcript.messages.length === 0) {
+      body.push("No user messages found.");
+    }
+  } else {
+    appendWrapped("First user message:", displayFirstUserMessage(session) || "-");
+    appendWrapped("Last user message:", displayLastUserMessage(session) || "-");
+  }
 
-  return lines.slice(0, rows).join("\n");
+  return [...header, ...body].join("\n");
 }
 
 function renderInteractivePicker(options) {

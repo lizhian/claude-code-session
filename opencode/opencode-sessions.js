@@ -20,6 +20,7 @@ const {
   resolveSessionChoice,
   runCommand,
 } = require("../common/session-utils");
+const { normalizeTranscriptMessages } = require("../common/session-transcript");
 
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-session", "opencode.json");
 
@@ -37,6 +38,10 @@ function timestampFromMs(value) {
     return "";
   }
   return new Date(number).toISOString();
+}
+
+function sqlString(value) {
+  return String(value).replace(/'/g, "''");
 }
 
 function sessionRows(dbPath) {
@@ -108,6 +113,45 @@ function summarizeSession(row, dbPath) {
     firstUserMessage: row.firstUserMessage || row.title || "",
     lastUserMessage: row.lastUserMessage || row.firstUserMessage || row.title || "",
   };
+}
+
+function loadSessionTranscript(session) {
+  if (!session || !session.file || !session.id) {
+    return normalizeTranscriptMessages([]);
+  }
+
+  const sql = `
+select
+  json_extract(m.data, '$.role') as role,
+  json_extract(p.data, '$.text') as text,
+  p.time_created as createdMs
+from part p
+join message m on m.id = p.message_id
+where p.session_id = '${sqlString(session.id)}'
+  and json_extract(p.data, '$.type') = 'text'
+  and json_extract(p.data, '$.text') is not null
+order by p.time_created asc, p.id asc;`;
+  const result = spawnSync("sqlite3", ["-json", session.file, sql], {
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+
+  if (result.error) {
+    throw new Error(`Failed to run sqlite3 for OpenCode transcript: ${result.error.message}`);
+  }
+
+  if (result.status !== 0) {
+    throw new Error((result.stderr || "").trim() || "Failed to read OpenCode transcript");
+  }
+
+  const rows = result.stdout.trim() ? JSON.parse(result.stdout.trim()) : [];
+  return normalizeTranscriptMessages(
+    rows.map((row) => ({
+      role: row.role || "message",
+      timestamp: timestampFromMs(row.createdMs),
+      text: row.text || "",
+    })),
+  );
 }
 
 function listSessions(options = {}) {
@@ -232,6 +276,7 @@ const pickSessionInteractive = createSessionPicker({
   renderWorkspacePicker,
   workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
   permissionModes: OPENCODE_PERMISSION_MODES,
+  loadSessionTranscript,
 });
 
 async function pickAndRunOpenCode(sessions, options = {}) {
@@ -389,6 +434,7 @@ module.exports = {
   formatSessions,
   listSessions,
   listWorkspaces,
+  loadSessionTranscript,
   parseArgs,
   pickAndRunOpenCode,
   renderInteractivePicker,

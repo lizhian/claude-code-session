@@ -207,6 +207,7 @@ function createSessionPicker({
   renderInteractivePicker,
   renderWorkspacePicker,
   workspaceCwd,
+  loadSessionTranscript,
   permissionModes = DEFAULT_PERMISSION_MODES,
 }) {
   const pickerPermissionModes = supportedPermissionModes(permissionModes);
@@ -234,6 +235,8 @@ function createSessionPicker({
     let sessionSelectedIndex = 0;
     let workspaceSelectedIndex = 0;
     let previousQueryHadText = false;
+    let previewTranscript = null;
+    let previewError = "";
 
     readline.emitKeypressEvents(input);
     input.setRawMode(true);
@@ -267,8 +270,33 @@ function createSessionPicker({
         return workspaceItems(workspaces, workspaceQuery);
       }
 
+      function resetPreview() {
+        previewTranscript = null;
+        previewError = "";
+      }
+
+      function enterPreview(item) {
+        if (!item || item.type !== "session") {
+          return;
+        }
+        resetPreview();
+        try {
+          previewTranscript = loadSessionTranscript
+            ? loadSessionTranscript(item.session, {
+                cwd: currentCwd,
+                dataHome,
+                homeOptionName,
+              })
+            : null;
+        } catch (error) {
+          previewError = error && error.message ? error.message : String(error);
+        }
+        view = "preview";
+        render();
+      }
+
       function render() {
-        output.write("\x1b[2J\x1b[H");
+        output.write(view === "preview" ? "\x1b[3J\x1b[2J\x1b[H" : "\x1b[2J\x1b[H");
 
         if (view === "workspaces") {
           const itemCount = currentWorkspaceItems().length;
@@ -302,6 +330,9 @@ function createSessionPicker({
                 rows: output.rows || 24,
                 columns: output.columns || 100,
                 previewSession: item.session,
+                previewTranscript,
+                previewError,
+                color: io.color ?? true,
               }),
             );
             return;
@@ -330,6 +361,7 @@ function createSessionPicker({
         if (key.name === "escape") {
           if (view === "preview") {
             view = "sessions";
+            resetPreview();
             render();
             return;
           }
@@ -348,6 +380,7 @@ function createSessionPicker({
               view = "sessions";
               sessionQuery = "";
               sessionSelectedIndex = 0;
+              resetPreview();
               previousQueryHadText = false;
               render();
             }
@@ -367,15 +400,13 @@ function createSessionPicker({
         if (key.name === "space" || str === " ") {
           if (view === "preview") {
             view = "sessions";
+            resetPreview();
             render();
             return;
           }
           if (view === "sessions") {
             const item = selectedSessionItem();
-            if (item && item.type === "session") {
-              view = "preview";
-              render();
-            }
+            enterPreview(item);
             return;
           }
         }
