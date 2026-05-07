@@ -1,8 +1,8 @@
-# Claude Code, Codex, and OpenCode Session Picker
+# Agent Session
 
 [中文](README.zh-CN.md) | English
 
-Interactive session pickers for Claude Code, Codex, and OpenCode. The existing Claude Code picker keeps using `cc`; Codex uses `cx`; OpenCode uses `oc`.
+Interactive session pickers for Claude Code, Codex, and OpenCode. Claude Code uses `cc`; Codex uses `cx`; OpenCode uses `oc`.
 
 ## Features
 
@@ -107,27 +107,27 @@ OpenCode currently supports only default and full permission modes.
 The selected Claude permission mode is saved to:
 
 ```bash
-~/.claude-code-session/config.json
+~/.agent-session/claude-code.json
 ```
 
 The selected Codex permission mode is saved to:
 
 ```bash
-~/.codex-code-session/config.json
+~/.agent-session/codex.json
 ```
 
 The selected OpenCode permission mode is saved to:
 
 ```bash
-~/.opencode-code-session/config.json
+~/.agent-session/opencode.json
 ```
 
 ## CLI
 
 ```bash
-node claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]
-node codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]
-node opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]
+node claude/claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]
+node codex/codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]
+node opencode/opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]
 ```
 
 Options:
@@ -142,18 +142,19 @@ Options:
 
 ## Project Structure
 
-- `claude-sessions.js`: Claude Code session CLI.
-- `codex-sessions.js`: Codex session CLI.
-- `opencode-sessions.js`: OpenCode session CLI. It reads `opencode.db` through `sqlite3`.
-- `session-utils.js`: shared config, JSONL, process launching, workspace filtering, and interactive picker helpers.
+- `claude/claude-sessions.js`: Claude Code session CLI.
+- `codex/codex-sessions.js`: Codex session CLI.
+- `opencode/opencode-sessions.js`: OpenCode session CLI. It reads `opencode.db` through `sqlite3`.
+- `common/session-utils.js`: shared config, JSONL, process launching, workspace filtering, and interactive picker helpers.
+- `common/session-renderer.js`: shared session table, workspace list, and interactive picker rendering.
 - `*.test.js`: Node test files for provider behavior and installer behavior.
 - `install.sh` and `install.ps1`: installers for aliases/functions.
 
 ## Design Notes
 
 - Claude, Codex, and OpenCode keep separate entry files so provider-specific storage and launch flags stay isolated.
-- Shared picker behavior lives in `session-utils.js` and the Claude renderer; Codex/OpenCode reuse it with provider-specific titles.
-- Permission modes are persisted per provider under each install config directory.
+- Shared picker behavior lives in `common/session-utils.js` and `common/session-renderer.js`; provider CLIs reuse it with provider-specific titles.
+- Permission modes are persisted per provider under `~/.agent-session`.
 - OpenCode full permission is passed through `OPENCODE_PERMISSION="allow"` because the OpenCode TUI does not support a matching command-line flag.
 
 ## Development

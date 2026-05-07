@@ -43,21 +43,18 @@ if [[ "$has_opencode" == true ]] && ! command -v sqlite3 >/dev/null 2>&1; then
 fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source_script="$script_dir/claude-sessions.js"
-utils_source_script="$script_dir/session-utils.js"
-codex_source_script="$script_dir/codex-sessions.js"
-opencode_source_script="$script_dir/opencode-sessions.js"
-install_dir="$HOME/.claude-code-session"
-codex_install_dir="$HOME/.codex-code-session"
-opencode_install_dir="$HOME/.opencode-code-session"
-installed_script="$install_dir/claude-sessions.js"
-installed_utils_script="$install_dir/session-utils.js"
+common_source_dir="$script_dir/common"
+claude_source_script="$script_dir/claude/claude-sessions.js"
+codex_source_script="$script_dir/codex/codex-sessions.js"
+opencode_source_script="$script_dir/opencode/opencode-sessions.js"
+install_dir="$HOME/.agent-session"
+common_install_dir="$install_dir/common"
+claude_install_dir="$install_dir/claude"
+codex_install_dir="$install_dir/codex"
+opencode_install_dir="$install_dir/opencode"
+installed_script="$claude_install_dir/claude-sessions.js"
 codex_installed_script="$codex_install_dir/codex-sessions.js"
-codex_support_script="$codex_install_dir/claude-sessions.js"
-codex_utils_script="$codex_install_dir/session-utils.js"
 opencode_installed_script="$opencode_install_dir/opencode-sessions.js"
-opencode_support_script="$opencode_install_dir/claude-sessions.js"
-opencode_utils_script="$opencode_install_dir/session-utils.js"
 alias_line="alias cc='$installed_script --pick --trust-current-folder'"
 codex_alias_line="alias cx='$codex_installed_script --pick --trust-current-folder'"
 opencode_alias_line="alias oc='$opencode_installed_script --pick --trust-current-folder'"
@@ -65,13 +62,16 @@ marker="# Claude Code session picker"
 codex_marker="# Codex session picker"
 opencode_marker="# OpenCode session picker"
 
-[[ -f "$source_script" ]] || fail "claude-sessions.js was not found next to install.sh."
-[[ -f "$utils_source_script" ]] || fail "session-utils.js was not found next to install.sh."
+[[ -f "$common_source_dir/session-utils.js" ]] || fail "common/session-utils.js was not found next to install.sh."
+[[ -f "$common_source_dir/session-renderer.js" ]] || fail "common/session-renderer.js was not found next to install.sh."
+if [[ "$has_claude" == true ]]; then
+  [[ -f "$claude_source_script" ]] || fail "claude/claude-sessions.js was not found next to install.sh."
+fi
 if [[ "$has_codex" == true ]]; then
-  [[ -f "$codex_source_script" ]] || fail "codex-sessions.js was not found next to install.sh."
+  [[ -f "$codex_source_script" ]] || fail "codex/codex-sessions.js was not found next to install.sh."
 fi
 if [[ "$has_opencode" == true ]]; then
-  [[ -f "$opencode_source_script" ]] || fail "opencode-sessions.js was not found next to install.sh."
+  [[ -f "$opencode_source_script" ]] || fail "opencode/opencode-sessions.js was not found next to install.sh."
 fi
 
 if [[ -n "${SHELL:-}" && "$(basename "$SHELL")" == "bash" ]]; then
@@ -80,32 +80,25 @@ else
   shell_rc="$HOME/.zshrc"
 fi
 
+mkdir -p "$common_install_dir"
+cp "$common_source_dir"/*.js "$common_install_dir/"
+
 if [[ "$has_claude" == true ]]; then
-  mkdir -p "$install_dir"
-  cp "$source_script" "$installed_script"
-  cp "$utils_source_script" "$installed_utils_script"
+  mkdir -p "$claude_install_dir"
+  cp "$claude_source_script" "$installed_script"
   chmod 755 "$installed_script"
-  chmod 755 "$installed_utils_script"
 fi
 
 if [[ "$has_codex" == true ]]; then
   mkdir -p "$codex_install_dir"
   cp "$codex_source_script" "$codex_installed_script"
-  cp "$source_script" "$codex_support_script"
-  cp "$utils_source_script" "$codex_utils_script"
   chmod 755 "$codex_installed_script"
-  chmod 755 "$codex_support_script"
-  chmod 755 "$codex_utils_script"
 fi
 
 if [[ "$has_opencode" == true ]]; then
   mkdir -p "$opencode_install_dir"
   cp "$opencode_source_script" "$opencode_installed_script"
-  cp "$source_script" "$opencode_support_script"
-  cp "$utils_source_script" "$opencode_utils_script"
   chmod 755 "$opencode_installed_script"
-  chmod 755 "$opencode_support_script"
-  chmod 755 "$opencode_utils_script"
 fi
 touch "$shell_rc"
 
@@ -136,12 +129,12 @@ mv "$tmp_file" "$shell_rc"
 
 available_aliases=""
 if [[ "$has_claude" == true ]]; then
-  info "Installed claude-sessions.js to $installed_script"
+  info "Installed claude/claude-sessions.js to $installed_script"
   info "Added alias cc to $shell_rc"
   available_aliases="cc"
 fi
 if [[ "$has_codex" == true ]]; then
-  info "Installed codex-sessions.js to $codex_installed_script"
+  info "Installed codex/codex-sessions.js to $codex_installed_script"
   info "Added alias cx to $shell_rc"
   if [[ -n "$available_aliases" ]]; then
     available_aliases+=", "
@@ -149,7 +142,7 @@ if [[ "$has_codex" == true ]]; then
   available_aliases+="cx"
 fi
 if [[ "$has_opencode" == true ]]; then
-  info "Installed opencode-sessions.js to $opencode_installed_script"
+  info "Installed opencode/opencode-sessions.js to $opencode_installed_script"
   info "Added alias oc to $shell_rc"
   if [[ -n "$available_aliases" ]]; then
     available_aliases+=", "

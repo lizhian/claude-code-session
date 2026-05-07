@@ -1,8 +1,8 @@
-# Claude Code、Codex 与 OpenCode Session Picker
+# Agent Session
 
 中文 | [English](README.md)
 
-Claude Code、Codex 与 OpenCode 的 session 交互式选择器。原有 Claude Code 选择器继续使用 `cc`，Codex 使用 `cx`，OpenCode 使用 `oc`。
+Claude Code、Codex 与 OpenCode 的 session 交互式选择器。Claude Code 使用 `cc`，Codex 使用 `cx`，OpenCode 使用 `oc`。
 
 ## 功能
 
@@ -111,27 +111,27 @@ OpenCode 当前只支持 default 和 full 权限模式。
 Claude 权限模式会自动记住，配置保存到：
 
 ```bash
-~/.claude-code-session/config.json
+~/.agent-session/claude-code.json
 ```
 
 Codex 权限模式会自动记住，配置保存到：
 
 ```bash
-~/.codex-code-session/config.json
+~/.agent-session/codex.json
 ```
 
 OpenCode 权限模式会自动记住，配置保存到：
 
 ```bash
-~/.opencode-code-session/config.json
+~/.agent-session/opencode.json
 ```
 
 ## CLI
 
 ```bash
-node claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]
-node codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]
-node opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]
+node claude/claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]
+node codex/codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]
+node opencode/opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]
 ```
 
 参数：
@@ -146,18 +146,19 @@ node opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home
 
 ## 项目结构
 
-- `claude-sessions.js`：Claude Code session CLI。
-- `codex-sessions.js`：Codex session CLI。
-- `opencode-sessions.js`：OpenCode session CLI，通过 `sqlite3` 读取 `opencode.db`。
-- `session-utils.js`：共享的配置、JSONL、进程启动、工作区过滤和交互式 picker 辅助逻辑。
+- `claude/claude-sessions.js`：Claude Code session CLI。
+- `codex/codex-sessions.js`：Codex session CLI。
+- `opencode/opencode-sessions.js`：OpenCode session CLI，通过 `sqlite3` 读取 `opencode.db`。
+- `common/session-utils.js`：共享的配置、JSONL、进程启动、工作区过滤和交互式 picker 辅助逻辑。
+- `common/session-renderer.js`：共享的 session 表格、workspace 列表和交互式 picker 渲染逻辑。
 - `*.test.js`：基于 Node test 的 provider 行为和安装器行为测试。
 - `install.sh` 和 `install.ps1`：安装 alias/function 的脚本。
 
 ## 设计说明
 
 - Claude、Codex 和 OpenCode 保持独立入口文件，避免不同 provider 的存储格式和启动参数互相影响。
-- 通用 picker 行为放在 `session-utils.js` 和 Claude 渲染逻辑中；Codex/OpenCode 复用该行为并替换 provider 标题。
-- permission mode 按 provider 分别持久化到各自的安装配置目录。
+- 通用 picker 行为放在 `common/session-utils.js` 和 `common/session-renderer.js`；各 provider CLI 复用它们并传入自己的标题。
+- permission mode 按 provider 分别持久化到 `~/.agent-session`。
 - OpenCode full permission 通过 `OPENCODE_PERMISSION="allow"` 传入，因为 OpenCode TUI 当前没有对应的命令行 flag。
 
 ## 开发

@@ -4,10 +4,11 @@
 
 This repository contains small Node.js CLIs for browsing Claude Code, Codex, and OpenCode sessions. Keep the provider CLIs additive: changes for `cx` or `oc` should not regress the existing `cc` behavior.
 
-- `claude-sessions.js`: Claude Code executable and exported helpers for listing, formatting, and launching sessions.
-- `codex-sessions.js`: Codex executable. It reuses Claude picker rendering while keeping Codex-specific session parsing and launch commands.
-- `opencode-sessions.js`: OpenCode executable. It reads OpenCode's SQLite database through `sqlite3`.
-- `session-utils.js`: shared config, JSONL, command launching, workspace filtering, and interactive picker state helpers.
+- `claude/claude-sessions.js`: Claude Code executable and exported helpers for listing, formatting, and launching sessions.
+- `codex/codex-sessions.js`: Codex executable with Codex-specific session parsing and launch commands.
+- `opencode/opencode-sessions.js`: OpenCode executable. It reads OpenCode's SQLite database through `sqlite3`.
+- `common/session-utils.js`: shared config, JSONL, command launching, workspace filtering, and interactive picker state helpers.
+- `common/session-renderer.js`: shared session table, workspace list, and interactive picker rendering.
 - `claude-sessions.test.js`, `codex-sessions.test.js`, and `opencode-sessions.test.js`: unit tests for provider-specific parsing, formatting, config, picker behavior, and launch commands.
 - `install.sh`: macOS/Linux installer that copies only detected agent CLIs plus shared support files and adds matching `cc`, `cx`, and/or `oc` aliases.
 - `install.ps1`: Windows PowerShell installer that adds matching `cc`, `cx`, and/or `oc` functions for detected agent CLIs.
@@ -15,18 +16,18 @@ This repository contains small Node.js CLIs for browsing Claude Code, Codex, and
 - `README.md` and `README.zh-CN.md`: user-facing documentation.
 - `package.json`: npm metadata, binary entries, and test/check scripts.
 
-There are no separate `src/`, `test/`, or asset directories; keep new project files at the root unless the codebase grows enough to justify a directory split.
+Provider-specific code lives in the provider directories. Shared support scripts live in `common/`. Tests remain co-located at the root unless the codebase grows enough to justify a dedicated test directory.
 
 ## Build, Test, and Development Commands
 
 - `npm test`: runs all tests with Node's built-in test runner.
 - `npm run check`: syntax-checks the CLI/shared JavaScript files and validates `install.sh` with `bash -n`.
-- `node claude-sessions.js --json`: lists sessions for the current directory as JSON.
-- `node codex-sessions.js --json`: lists Codex sessions for the current directory as JSON.
-- `node opencode-sessions.js --json`: lists OpenCode sessions for the current directory as JSON.
-- `node claude-sessions.js --pick`: opens the interactive picker locally.
-- `node codex-sessions.js --pick`: opens the Codex picker locally.
-- `node opencode-sessions.js --pick`: opens the OpenCode picker locally.
+- `node claude/claude-sessions.js --json`: lists sessions for the current directory as JSON.
+- `node codex/codex-sessions.js --json`: lists Codex sessions for the current directory as JSON.
+- `node opencode/opencode-sessions.js --json`: lists OpenCode sessions for the current directory as JSON.
+- `node claude/claude-sessions.js --pick`: opens the interactive picker locally.
+- `node codex/codex-sessions.js --pick`: opens the Codex picker locally.
+- `node opencode/opencode-sessions.js --pick`: opens the OpenCode picker locally.
 - `./install.sh` or `.\install.ps1`: installs aliases/functions only for agent CLIs currently found in `PATH`.
 
 ## Coding Style & Naming Conventions
@@ -43,4 +44,18 @@ Recent history uses conventional commit prefixes such as `feat:`, `fix:`, and `d
 
 ## Security & Configuration Tips
 
-Do not commit generated files from `~/.claude-code-session`, `~/.codex-code-session`, `~/.opencode-code-session`, `~/.claude`, `~/.codex`, or OpenCode's data directory. Be careful with permission flags: Claude full uses `--dangerously-skip-permissions`, Codex full uses `--dangerously-bypass-approvals-and-sandbox`, and OpenCode full uses `OPENCODE_PERMISSION="allow"` instead of an unsupported TUI flag. Claude/Codex support default, auto, and full permission modes; OpenCode currently supports default and full only. Keep the picker labels in English (`Permission`, `Matches`, `Search`) and keep status columns fixed-width so changing values do not move later fields. Changes around permission mode or `--trust-current-folder` should be explicit in the PR description and covered by tests where possible.
+Do not commit generated files from `~/.agent-session`, `~/.claude`, `~/.codex`, or OpenCode's data directory. Be careful with permission flags: Claude full uses `--dangerously-skip-permissions`, Codex full uses `--dangerously-bypass-approvals-and-sandbox`, and OpenCode full uses `OPENCODE_PERMISSION="allow"` instead of an unsupported TUI flag. Claude/Codex support default, auto, and full permission modes; OpenCode currently supports default and full only. Keep the picker labels in English (`Permission`, `Matches`, `Search`) and keep status columns fixed-width so changing values do not move later fields. Changes around permission mode or `--trust-current-folder` should be explicit in the PR description and covered by tests where possible.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues for `lizhian/agent-session`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the default five-label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses a single-context domain docs layout. See `docs/agents/domain.md`.

@@ -71,31 +71,23 @@ test("install script copies the picker and adds a zsh alias", () => {
     shellRcName: ".zshrc",
     shellRcContent: "# existing config\n",
   });
-  const installedScript = path.join(home, ".claude-code-session", "claude-sessions.js");
-  const installedUtilsScript = path.join(home, ".claude-code-session", "session-utils.js");
-  const installedCodexScript = path.join(home, ".codex-code-session", "codex-sessions.js");
-  const installedCodexSupportScript = path.join(home, ".codex-code-session", "claude-sessions.js");
-  const installedCodexUtilsScript = path.join(home, ".codex-code-session", "session-utils.js");
-  const installedOpenCodeScript = path.join(home, ".opencode-code-session", "opencode-sessions.js");
-  const installedOpenCodeSupportScript = path.join(home, ".opencode-code-session", "claude-sessions.js");
-  const installedOpenCodeUtilsScript = path.join(home, ".opencode-code-session", "session-utils.js");
+  const installDir = path.join(home, ".agent-session");
+  const installedScript = path.join(installDir, "claude", "claude-sessions.js");
+  const installedUtilsScript = path.join(installDir, "common", "session-utils.js");
+  const installedRendererScript = path.join(installDir, "common", "session-renderer.js");
+  const installedCodexScript = path.join(installDir, "codex", "codex-sessions.js");
+  const installedOpenCodeScript = path.join(installDir, "opencode", "opencode-sessions.js");
   const zshrc = fs.readFileSync(path.join(home, ".zshrc"), "utf8");
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal(fs.existsSync(installedScript), true);
   assert.equal(fs.existsSync(installedUtilsScript), true);
+  assert.equal(fs.existsSync(installedRendererScript), true);
   assert.equal(fs.existsSync(installedCodexScript), true);
-  assert.equal(fs.existsSync(installedCodexSupportScript), true);
-  assert.equal(fs.existsSync(installedCodexUtilsScript), true);
   assert.equal(fs.existsSync(installedOpenCodeScript), true);
-  assert.equal(fs.existsSync(installedOpenCodeSupportScript), true);
-  assert.equal(fs.existsSync(installedOpenCodeUtilsScript), true);
   assert.equal(fs.statSync(installedScript).mode & 0o111, 0o111);
-  assert.equal(fs.statSync(installedUtilsScript).mode & 0o111, 0o111);
   assert.equal(fs.statSync(installedCodexScript).mode & 0o111, 0o111);
-  assert.equal(fs.statSync(installedCodexUtilsScript).mode & 0o111, 0o111);
   assert.equal(fs.statSync(installedOpenCodeScript).mode & 0o111, 0o111);
-  assert.equal(fs.statSync(installedOpenCodeUtilsScript).mode & 0o111, 0o111);
   assert.match(zshrc, /# Claude Code session picker/);
   assert.match(zshrc, /# Codex session picker/);
   assert.match(zshrc, /# OpenCode session picker/);
@@ -156,15 +148,18 @@ test("install script installs only agents found in PATH", () => {
       "",
     ].join("\n"),
   });
-  const installedScript = path.join(home, ".claude-code-session", "claude-sessions.js");
-  const installedCodexScript = path.join(home, ".codex-code-session", "codex-sessions.js");
-  const installedOpenCodeScript = path.join(home, ".opencode-code-session", "opencode-sessions.js");
+  const installDir = path.join(home, ".agent-session");
+  const installedScript = path.join(installDir, "claude", "claude-sessions.js");
+  const installedCodexScript = path.join(installDir, "codex", "codex-sessions.js");
+  const installedOpenCodeScript = path.join(installDir, "opencode", "opencode-sessions.js");
+  const installedUtilsScript = path.join(installDir, "common", "session-utils.js");
   const zshrc = fs.readFileSync(path.join(home, ".zshrc"), "utf8");
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal(fs.existsSync(installedScript), false);
   assert.equal(fs.existsSync(installedCodexScript), true);
   assert.equal(fs.existsSync(installedOpenCodeScript), false);
+  assert.equal(fs.existsSync(installedUtilsScript), true);
   assert.doesNotMatch(zshrc, /# Claude Code session picker/);
   assert.match(zshrc, /# Codex session picker/);
   assert.doesNotMatch(zshrc, /# OpenCode session picker/);

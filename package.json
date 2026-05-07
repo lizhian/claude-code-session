@@ -1,15 +1,15 @@
 {
-  "name": "claude-code-session",
+  "name": "agent-session",
   "version": "0.1.0",
   "description": "Interactive session pickers for Claude Code, Codex, and OpenCode",
   "bin": {
-    "claude-code-session": "./claude-sessions.js",
-    "codex-code-session": "./codex-sessions.js",
-    "opencode-code-session": "./opencode-sessions.js"
+    "claude-code-session": "./claude/claude-sessions.js",
+    "codex-code-session": "./codex/codex-sessions.js",
+    "opencode-code-session": "./opencode/opencode-sessions.js"
   },
   "scripts": {
     "test": "node --test claude-sessions.test.js codex-sessions.test.js opencode-sessions.test.js install.test.js install-windows.test.js",
-    "check": "node --check claude-sessions.js && node --check codex-sessions.js && node --check opencode-sessions.js && node --check session-utils.js && bash -n install.sh"
+    "check": "node --check claude/claude-sessions.js && node --check codex/codex-sessions.js && node --check opencode/opencode-sessions.js && node --check common/session-utils.js && node --check common/session-renderer.js && bash -n install.sh"
   },
   "keywords": [
     "claude",

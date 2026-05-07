@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { PassThrough } = require("node:stream");
 const test = require("node:test");
 
 const {
@@ -19,13 +20,13 @@ const {
   renderInteractivePicker,
   renderWorkspacePicker,
   savePermissionMode,
-  shortSessionId,
   truncateToWidth,
   listSessions,
-} = require("./claude-sessions");
+} = require("./claude/claude-sessions");
+const { createSessionPicker } = require("./common/session-utils");
 
 test("stores default config under the install directory", () => {
-  assert.equal(DEFAULT_CONFIG_PATH, path.join(os.homedir(), ".claude-code-session", "config.json"));
+  assert.equal(DEFAULT_CONFIG_PATH, path.join(os.homedir(), ".agent-session", "claude-code.json"));
 });
 
 test("encodes absolute paths the way Claude Code stores project directories", () => {
@@ -34,8 +35,8 @@ test("encodes absolute paths the way Claude Code stores project directories", ()
 
   assert.equal(encodeProjectPath(path.join(root, "tmp", "临时")), `${encodedRoot}tmp---`);
   assert.equal(
-    encodeProjectPath(path.join(root, "workspace", "2026-04-29", "claude-code-session")),
-    `${encodedRoot}workspace-2026-04-29-claude-code-session`,
+    encodeProjectPath(path.join(root, "workspace", "2026-04-29", "agent-session")),
+    `${encodedRoot}workspace-2026-04-29-agent-session`,
   );
 });
 
@@ -111,10 +112,11 @@ test("formats a compact table for terminal output", () => {
     },
   ]);
 
-  assert.match(output, /SESSION ID/);
+  assert.match(output, /^#  MESSAGES/m);
   assert.match(output, /FIRST USER MESSAGE/);
   assert.match(output, /LAST USER MESSAGE/);
-  assert.match(output, /11111111-2222-3333-4444-555555555555/);
+  assert.doesNotMatch(output, /11111111-2222-3333-4444-555555555555/);
+  assert.match(output, /^1  2/m);
   assert.match(output, /first prompt/);
   assert.match(output, /last prompt/);
 });
@@ -130,8 +132,9 @@ test("formats interactive picker with new session first", () => {
     },
   ], new Date("2026-04-29T03:00:05.000Z"));
 
-  assert.match(output, /0\. New session/);
-  assert.match(output, /1\. 11111111/);
+  assert.match(output, /0\. new/);
+  assert.match(output, /1\. 3小时前/);
+  assert.doesNotMatch(output, /11111111/);
   assert.doesNotMatch(output, /11111111-2222-3333-4444-555555555555/);
   assert.match(output, /3小时前/);
   assert.match(output, /first prompt/);
@@ -215,10 +218,9 @@ test("rejects invalid picker choices", () => {
   );
 });
 
-test("formats session ids and relative times for the picker", () => {
+test("formats relative times for the picker", () => {
   const now = new Date("2026-04-29T12:00:00.000Z");
 
-  assert.equal(shortSessionId("11111111-2222-3333-4444-555555555555"), "11111111");
   assert.equal(formatSessionTime("2026-04-29T11:59:00.000Z", now), "1分钟前");
   assert.equal(formatSessionTime("2026-04-29T09:00:00.000Z", now), "3小时前");
   assert.equal(formatSessionTime("2026-04-28T12:00:00.000Z", now), "1天前");
@@ -272,6 +274,7 @@ test("renders searchable picker with highlighted selection", () => {
     rows: 20,
   });
 
+  assert.match(output, /^Claude Code sessions  11111111-2222-3333-4444-555555555555$/m);
   assert.match(output, /Workspace: \/tmp\/payment-api/);
   assert.match(output, /^Permission: full {8}Matches: 1 {8}Search: last$/m);
   assert.doesNotMatch(output, /^Search: /m);
@@ -282,11 +285,126 @@ test("renders searchable picker with highlighted selection", () => {
   assert.doesNotMatch(output, /type search/);
   assert.doesNotMatch(output, /Enter open/);
   assert.doesNotMatch(output, /Esc cancel/);
-  assert.match(output, /> 1\. 11111111/);
+  assert.match(output, /> 1\. 3小时前/);
   assert.match(output, /first prompt/);
   assert.match(output, /last prompt/);
   assert.match(output, /3小时前/);
-  assert.doesNotMatch(output, /11111111-2222-3333-4444-555555555555/);
+});
+
+test("renders only the picker title when new session is selected", () => {
+  const output = renderInteractivePicker({
+    sessions: [
+      {
+        id: "11111111-2222-3333-4444-555555555555",
+        messageCount: 2,
+      },
+    ],
+    selectedIndex: 0,
+    cwd: "/tmp/payment-api",
+    rows: 20,
+  });
+
+  assert.match(output, /^Claude Code sessions$/m);
+  assert.doesNotMatch(output.split("\n")[0], /New session/);
+  assert.doesNotMatch(output.split("\n")[0], /Session:/);
+});
+
+test("renders selected session summary preview", () => {
+  const output = renderInteractivePicker({
+    sessions: [
+      {
+        id: "11111111-2222-3333-4444-555555555555",
+        messageCount: 2,
+        startedAt: "2026-04-29T00:00:00.000Z",
+        updatedAt: "2026-04-29T00:00:05.000Z",
+        version: "2.1.83",
+        gitBranch: "main",
+        firstUserMessage: "first prompt",
+        lastUserMessage: "last prompt",
+      },
+    ],
+    selectedIndex: 1,
+    previewSession: {
+      id: "11111111-2222-3333-4444-555555555555",
+      messageCount: 2,
+      startedAt: "2026-04-29T00:00:00.000Z",
+      updatedAt: "2026-04-29T00:00:05.000Z",
+      version: "2.1.83",
+      gitBranch: "main",
+      firstUserMessage: "first prompt",
+      lastUserMessage: "last prompt",
+    },
+    cwd: "/tmp/payment-api",
+    rows: 20,
+    columns: 100,
+  });
+
+  assert.match(output, /^Claude Code sessions  11111111-2222-3333-4444-555555555555$/m);
+  assert.match(output, /Messages: 2  Started: 2026-04-29T00:00:00.000Z  Updated: 2026-04-29T00:00:05.000Z/);
+  assert.match(output, /Version: 2.1.83  Branch: main/);
+  assert.match(output, /First user message:/);
+  assert.match(output, /first prompt/);
+  assert.match(output, /Last user message:/);
+  assert.match(output, /last prompt/);
+});
+
+test("space previews selected sessions and escape returns to the session list", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let rendered = "";
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+  output.on("data", (chunk) => {
+    rendered += chunk.toString("utf8");
+  });
+
+  const sessions = [
+    {
+      id: "11111111-2222-3333-4444-555555555555",
+      messageCount: 2,
+      firstUserMessage: "first prompt",
+      lastUserMessage: "last prompt",
+    },
+  ];
+  const picker = createSessionPicker({
+    configPath: path.join(os.tmpdir(), "agent-session-preview-test.json"),
+    defaultHome: () => os.tmpdir(),
+    homeOptionName: "claudeHome",
+    listSessions: () => sessions,
+    listWorkspaces: () => [],
+    filterSessions,
+    renderInteractivePicker,
+    renderWorkspacePicker,
+    workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
+  });
+  const picked = picker(sessions, {
+    input,
+    output,
+    cwd: "/tmp/payment-api",
+    claudeHome: os.tmpdir(),
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "down" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", " ", { name: "space" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(rendered, /First user message:/);
+  assert.match(rendered, /last prompt/);
+
+  rendered = "";
+  input.emit("keypress", "", { name: "escape" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(rendered, /> 1\./);
+  assert.doesNotMatch(rendered, /First user message:/);
+
+  input.emit("keypress", "", { name: "return" });
+  const result = await picked;
+  assert.equal(result.item.type, "session");
+  assert.equal(result.item.session.id, "11111111-2222-3333-4444-555555555555");
 });
 
 test("renders picker status fields in fixed columns", () => {
@@ -352,7 +470,7 @@ test("renders picker rows with aligned columns and width-limited prompts", () =>
     rows: 20,
     columns: 72,
   });
-  const lines = output.split("\n").filter((line) => /\d\.\s+(11111111|aaaaaaaa)/.test(line));
+  const lines = output.split("\n").filter((line) => /\d\.\s+(1分钟前|2026-04-25)/.test(line));
   function nthIndexOf(value, search, occurrence) {
     let fromIndex = 0;
     for (let index = 1; index <= occurrence; index += 1) {
@@ -382,7 +500,7 @@ test("renders picker rows with aligned columns and width-limited prompts", () =>
   assert.equal(firstPromptStarts[0], firstPromptStarts[1]);
   assert.equal(lastPromptStarts[0], lastPromptStarts[1]);
   assert.match(lines[0], /short prompt/);
-  assert.match(lines[0], /short last pr\.\.\./);
+  assert.match(lines[0], /short last prompt/);
   assert.ok(lines.every((line) => displayWidth(line) <= 72));
   assert.ok(lines[1].endsWith("..."));
 });

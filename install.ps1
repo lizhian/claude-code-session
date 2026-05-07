@@ -34,56 +34,55 @@ if ($HasOpenCode -and -not (Get-Command sqlite3 -ErrorAction SilentlyContinue)) 
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$SourceScript = Join-Path $ScriptDir "claude-sessions.js"
-$UtilsSourceScript = Join-Path $ScriptDir "session-utils.js"
-$CodexSourceScript = Join-Path $ScriptDir "codex-sessions.js"
-$OpenCodeSourceScript = Join-Path $ScriptDir "opencode-sessions.js"
-$InstallDir = Join-Path $HOME ".claude-code-session"
-$CodexInstallDir = Join-Path $HOME ".codex-code-session"
-$OpenCodeInstallDir = Join-Path $HOME ".opencode-code-session"
-$InstalledScript = Join-Path $InstallDir "claude-sessions.js"
-$InstalledUtilsScript = Join-Path $InstallDir "session-utils.js"
+$CommonSourceDir = Join-Path $ScriptDir "common"
+$SourceScript = Join-Path (Join-Path $ScriptDir "claude") "claude-sessions.js"
+$CodexSourceScript = Join-Path (Join-Path $ScriptDir "codex") "codex-sessions.js"
+$OpenCodeSourceScript = Join-Path (Join-Path $ScriptDir "opencode") "opencode-sessions.js"
+$InstallDir = Join-Path $HOME ".agent-session"
+$CommonInstallDir = Join-Path $InstallDir "common"
+$ClaudeInstallDir = Join-Path $InstallDir "claude"
+$CodexInstallDir = Join-Path $InstallDir "codex"
+$OpenCodeInstallDir = Join-Path $InstallDir "opencode"
+$InstalledScript = Join-Path $ClaudeInstallDir "claude-sessions.js"
 $CodexInstalledScript = Join-Path $CodexInstallDir "codex-sessions.js"
-$CodexSupportScript = Join-Path $CodexInstallDir "claude-sessions.js"
-$CodexUtilsScript = Join-Path $CodexInstallDir "session-utils.js"
 $OpenCodeInstalledScript = Join-Path $OpenCodeInstallDir "opencode-sessions.js"
-$OpenCodeSupportScript = Join-Path $OpenCodeInstallDir "claude-sessions.js"
-$OpenCodeUtilsScript = Join-Path $OpenCodeInstallDir "session-utils.js"
 
-if (-not (Test-Path $SourceScript)) {
-  Fail "claude-sessions.js was not found next to install.ps1."
+if (-not (Test-Path (Join-Path $CommonSourceDir "session-utils.js"))) {
+  Fail "common/session-utils.js was not found next to install.ps1."
 }
 
-if (-not (Test-Path $UtilsSourceScript)) {
-  Fail "session-utils.js was not found next to install.ps1."
+if (-not (Test-Path (Join-Path $CommonSourceDir "session-renderer.js"))) {
+  Fail "common/session-renderer.js was not found next to install.ps1."
+}
+
+if ($HasClaude -and -not (Test-Path $SourceScript)) {
+  Fail "claude/claude-sessions.js was not found next to install.ps1."
 }
 
 if ($HasCodex -and -not (Test-Path $CodexSourceScript)) {
-  Fail "codex-sessions.js was not found next to install.ps1."
+  Fail "codex/codex-sessions.js was not found next to install.ps1."
 }
 
 if ($HasOpenCode -and -not (Test-Path $OpenCodeSourceScript)) {
-  Fail "opencode-sessions.js was not found next to install.ps1."
+  Fail "opencode/opencode-sessions.js was not found next to install.ps1."
 }
 
+New-Item -ItemType Directory -Path $CommonInstallDir -Force | Out-Null
+Copy-Item -Path (Join-Path $CommonSourceDir "*.js") -Destination $CommonInstallDir -Force
+
 if ($HasClaude) {
-  New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+  New-Item -ItemType Directory -Path $ClaudeInstallDir -Force | Out-Null
   Copy-Item -Path $SourceScript -Destination $InstalledScript -Force
-  Copy-Item -Path $UtilsSourceScript -Destination $InstalledUtilsScript -Force
 }
 
 if ($HasCodex) {
   New-Item -ItemType Directory -Path $CodexInstallDir -Force | Out-Null
   Copy-Item -Path $CodexSourceScript -Destination $CodexInstalledScript -Force
-  Copy-Item -Path $SourceScript -Destination $CodexSupportScript -Force
-  Copy-Item -Path $UtilsSourceScript -Destination $CodexUtilsScript -Force
 }
 
 if ($HasOpenCode) {
   New-Item -ItemType Directory -Path $OpenCodeInstallDir -Force | Out-Null
   Copy-Item -Path $OpenCodeSourceScript -Destination $OpenCodeInstalledScript -Force
-  Copy-Item -Path $SourceScript -Destination $OpenCodeSupportScript -Force
-  Copy-Item -Path $UtilsSourceScript -Destination $OpenCodeUtilsScript -Force
 }
 
 $ProfilePath = $PROFILE.CurrentUserAllHosts
@@ -157,17 +156,17 @@ Set-Content -Path $ProfilePath -Value $UpdatedProfile -Encoding UTF8
 
 $AvailableAliases = @()
 if ($HasClaude) {
-  Write-Host "Installed claude-sessions.js to $InstalledScript"
+  Write-Host "Installed claude/claude-sessions.js to $InstalledScript"
   Write-Host "Added cc function to $ProfilePath"
   $AvailableAliases += "cc"
 }
 if ($HasCodex) {
-  Write-Host "Installed codex-sessions.js to $CodexInstalledScript"
+  Write-Host "Installed codex/codex-sessions.js to $CodexInstalledScript"
   Write-Host "Added cx function to $ProfilePath"
   $AvailableAliases += "cx"
 }
 if ($HasOpenCode) {
-  Write-Host "Installed opencode-sessions.js to $OpenCodeInstalledScript"
+  Write-Host "Installed opencode/opencode-sessions.js to $OpenCodeInstalledScript"
   Write-Host "Added oc function to $ProfilePath"
   $AvailableAliases += "oc"
 }

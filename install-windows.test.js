@@ -21,12 +21,13 @@ test("Windows installer contains required environment checks", () => {
   assert.match(script, /Write-Warning "sqlite3/);
   assert.match(script, /claude-sessions\.js/);
   assert.match(script, /session-utils\.js/);
+  assert.match(script, /session-renderer\.js/);
   assert.match(script, /codex-sessions\.js/);
   assert.match(script, /opencode-sessions\.js/);
-  assert.match(script, /CodexSupportScript/);
-  assert.match(script, /CodexUtilsScript/);
-  assert.match(script, /OpenCodeSupportScript/);
-  assert.match(script, /OpenCodeUtilsScript/);
+  assert.match(script, /CommonSourceDir/);
+  assert.match(script, /CommonInstallDir/);
+  assert.doesNotMatch(script, /CodexSupportScript/);
+  assert.doesNotMatch(script, /OpenCodeSupportScript/);
 });
 
 test("Windows installer gates copies and functions by detected agents", () => {
@@ -43,9 +44,10 @@ test("Windows installer gates copies and functions by detected agents", () => {
 test("Windows installer installs under the shared install directory", () => {
   const script = fs.readFileSync(installScript, "utf8");
 
-  assert.match(script, /\.claude-code-session/);
-  assert.match(script, /\.codex-code-session/);
-  assert.match(script, /\.opencode-code-session/);
+  assert.match(script, /\.agent-session/);
+  assert.doesNotMatch(script, /\.claude-code-session/);
+  assert.doesNotMatch(script, /\.codex-code-session/);
+  assert.doesNotMatch(script, /\.opencode-code-session/);
   assert.match(script, /Copy-Item/);
   assert.match(script, /\$HOME/);
 });

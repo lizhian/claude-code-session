@@ -250,9 +250,14 @@ function createSessionPicker({
 
       function currentSessionItems() {
         return [
-          { type: "new", label: "New session" },
+          { type: "new", label: "new" },
           ...filterSessions(sessions, sessionQuery).map((session) => ({ type: "session", session })),
         ];
+      }
+
+      function selectedSessionItem() {
+        const items = currentSessionItems();
+        return items[clampSelectedIndex(sessionSelectedIndex, items.length)];
       }
 
       function currentWorkspaceItems() {
@@ -282,6 +287,26 @@ function createSessionPicker({
 
         const itemCount = currentSessionItems().length;
         sessionSelectedIndex = clampSelectedIndex(sessionSelectedIndex, itemCount);
+        if (view === "preview") {
+          const item = selectedSessionItem();
+          if (!item || item.type !== "session") {
+            view = "sessions";
+          } else {
+            output.write(
+              renderInteractivePicker({
+                sessions,
+                query: sessionQuery,
+                selectedIndex: sessionSelectedIndex,
+                permissionMode,
+                cwd: currentCwd,
+                rows: output.rows || 24,
+                columns: output.columns || 100,
+                previewSession: item.session,
+              }),
+            );
+            return;
+          }
+        }
         output.write(
           renderInteractivePicker({
             sessions,
@@ -296,7 +321,18 @@ function createSessionPicker({
       }
 
       function onKeypress(str, key = {}) {
-        if ((key.ctrl && key.name === "c") || key.name === "escape") {
+        if (key.ctrl && key.name === "c") {
+          cleanup();
+          resolve(null);
+          return;
+        }
+
+        if (key.name === "escape") {
+          if (view === "preview") {
+            view = "sessions";
+            render();
+            return;
+          }
           cleanup();
           resolve(null);
           return;
@@ -318,14 +354,33 @@ function createSessionPicker({
             return;
           }
 
-          const items = currentSessionItems();
-          const item = items[clampSelectedIndex(sessionSelectedIndex, items.length)];
+          const item = selectedSessionItem();
           cleanup();
           resolve({
-            item: item || { type: "new", label: "New session" },
+            item: item || { type: "new", label: "new" },
             permissionMode,
             cwd: currentCwd,
           });
+          return;
+        }
+
+        if (key.name === "space" || str === " ") {
+          if (view === "preview") {
+            view = "sessions";
+            render();
+            return;
+          }
+          if (view === "sessions") {
+            const item = selectedSessionItem();
+            if (item && item.type === "session") {
+              view = "preview";
+              render();
+            }
+            return;
+          }
+        }
+
+        if (view === "preview") {
           return;
         }
 

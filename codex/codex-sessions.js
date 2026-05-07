@@ -7,19 +7,21 @@ const path = require("node:path");
 const {
   filterSessions,
   formatPicker,
-  formatSessions: formatClaudeSessions,
-  loadPermissionMode,
-} = require("./claude-sessions");
+  formatSessions: formatProviderSessions,
+  renderInteractivePicker: renderProviderInteractivePicker,
+  renderWorkspacePicker: renderProviderWorkspacePicker,
+} = require("../common/session-renderer");
 const {
   askQuestion,
   createSessionPicker,
+  loadPermissionMode,
   normalizePermissionMode,
   readJsonLines,
   resolveSessionChoice,
   runCommand,
-} = require("./session-utils");
+} = require("../common/session-utils");
 
-const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".codex-code-session", "config.json");
+const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-session", "codex.json");
 
 function collectJsonlFiles(rootDir) {
   if (!fs.existsSync(rootDir)) {
@@ -200,19 +202,15 @@ function listWorkspaces(options = {}) {
 }
 
 function renderInteractivePicker(options = {}) {
-  return require("./claude-sessions")
-    .renderInteractivePicker(options)
-    .replace(/^Claude Code sessions/m, "Codex sessions");
+  return renderProviderInteractivePicker({ ...options, title: "Codex sessions" });
 }
 
 function renderWorkspacePicker(options = {}) {
-  return require("./claude-sessions")
-    .renderWorkspacePicker(options)
-    .replace(/^Claude Code workspaces/m, "Codex workspaces");
+  return renderProviderWorkspacePicker({ ...options, title: "Codex workspaces" });
 }
 
 function formatSessions(sessions) {
-  return formatClaudeSessions(sessions).replace("Claude Code session", "Codex session");
+  return formatProviderSessions(sessions, { providerName: "Codex" });
 }
 
 function launchArgs(permissionMode) {
@@ -371,11 +369,11 @@ function parseArgs(argv) {
 
 function usage() {
   return [
-    "Usage: node codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]",
+    "Usage: node codex/codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]",
     "",
     "获取指定目录对应的 Codex sessions。默认读取当前目录和 ~/.codex。",
     "交互模式快捷键：Tab 切换 default/auto/full permission，→ 选择 Codex 工作区，← 返回 session 列表。",
-    "权限模式会自动记住，配置保存在 ~/.codex-code-session/config.json。",
+    "权限模式会自动记住，配置保存在 ~/.agent-session/codex.json。",
     "",
     "Options:",
     "  --json                 输出 JSON，方便 jq 或其他脚本处理",

@@ -14,8 +14,8 @@ const {
   renderInteractivePicker,
   renderWorkspacePicker,
   selectedItemToCommand,
-} = require("./opencode-sessions");
-const { nextPermissionMode } = require("./session-utils");
+} = require("./opencode/opencode-sessions");
+const { nextPermissionMode } = require("./common/session-utils");
 
 function sqlite(dbPath, sql) {
   const result = spawnSync("sqlite3", [dbPath, sql], { encoding: "utf8" });
@@ -54,7 +54,7 @@ function insertSession(dbPath, options) {
 }
 
 test("stores default OpenCode config under the OpenCode picker install directory", () => {
-  assert.equal(DEFAULT_CONFIG_PATH, path.join(os.homedir(), ".opencode-code-session", "config.json"));
+  assert.equal(DEFAULT_CONFIG_PATH, path.join(os.homedir(), ".agent-session", "opencode.json"));
 });
 
 test("lists sessions for a cwd from OpenCode sqlite data", () => {
@@ -226,9 +226,10 @@ test("renders OpenCode picker titles without changing picker behavior", () => {
     now: new Date("2026-04-27T22:56:33.359Z"),
   });
 
-  assert.match(output, /OpenCode sessions/);
+  assert.match(output, /^OpenCode sessions  ses_demo_1$/m);
   assert.match(output, /Permission: default/);
-  assert.match(output, /> 1\. ses_demo/);
+  assert.match(output, /> 1\. 1小时前/);
+  assert.doesNotMatch(output, /> 1\. ses_demo/);
 });
 
 test("renders OpenCode workspace picker title", () => {

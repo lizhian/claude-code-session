@@ -8,18 +8,20 @@ const { spawnSync } = require("node:child_process");
 const {
   filterSessions,
   formatPicker,
-  formatSessions: formatClaudeSessions,
-  loadPermissionMode,
-} = require("./claude-sessions");
+  formatSessions: formatProviderSessions,
+  renderInteractivePicker: renderProviderInteractivePicker,
+  renderWorkspacePicker: renderProviderWorkspacePicker,
+} = require("../common/session-renderer");
 const {
   askQuestion,
   createSessionPicker,
+  loadPermissionMode,
   normalizePermissionMode,
   resolveSessionChoice,
   runCommand,
-} = require("./session-utils");
+} = require("../common/session-utils");
 
-const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".opencode-code-session", "config.json");
+const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-session", "opencode.json");
 
 function defaultOpenCodeDataHome() {
   return process.env.OPENCODE_DATA_HOME || path.join(os.homedir(), ".local", "share", "opencode");
@@ -165,25 +167,23 @@ function listWorkspaces(options = {}) {
 }
 
 function renderInteractivePicker(options = {}) {
-  return require("./claude-sessions")
-    .renderInteractivePicker({
-      ...options,
-      permissionMode: normalizePermissionMode(
-        options.permissionMode || options.launchMode,
-        OPENCODE_PERMISSION_MODES,
-      ),
-    })
-    .replace(/^Claude Code sessions/m, "OpenCode sessions");
+  return renderProviderInteractivePicker({
+    ...options,
+    title: "OpenCode sessions",
+    permissionMode: normalizePermissionMode(
+      options.permissionMode || options.launchMode,
+      OPENCODE_PERMISSION_MODES,
+    ),
+    permissionModes: OPENCODE_PERMISSION_MODES,
+  });
 }
 
 function renderWorkspacePicker(options = {}) {
-  return require("./claude-sessions")
-    .renderWorkspacePicker(options)
-    .replace(/^Claude Code workspaces/m, "OpenCode workspaces");
+  return renderProviderWorkspacePicker({ ...options, title: "OpenCode workspaces" });
 }
 
 function formatSessions(sessions) {
-  return formatClaudeSessions(sessions).replace("Claude Code session", "OpenCode session");
+  return formatProviderSessions(sessions, { providerName: "OpenCode" });
 }
 
 const OPENCODE_PERMISSION_MODES = ["default", "full"];
@@ -309,11 +309,11 @@ function parseArgs(argv) {
 
 function usage() {
   return [
-    "Usage: node opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]",
+    "Usage: node opencode/opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]",
     "",
     "获取指定目录对应的 OpenCode sessions。默认读取当前目录和 ~/.local/share/opencode。",
     "交互模式快捷键：Tab 切换 default/full permission，→ 选择 OpenCode 工作区，← 返回 session 列表。",
-    "权限模式会自动记住，配置保存在 ~/.opencode-code-session/config.json。",
+    "权限模式会自动记住，配置保存在 ~/.agent-session/opencode.json。",
     "",
     "Options:",
     "  --json                       输出 JSON，方便 jq 或其他脚本处理",

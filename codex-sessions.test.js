@@ -13,7 +13,7 @@ const {
   parseArgs,
   renderInteractivePicker,
   renderWorkspacePicker,
-} = require("./codex-sessions");
+} = require("./codex/codex-sessions");
 
 function writeCodexSession(file, options) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -45,7 +45,7 @@ function writeCodexSession(file, options) {
 }
 
 test("stores default Codex config under the Codex picker install directory", () => {
-  assert.equal(DEFAULT_CONFIG_PATH, path.join(os.homedir(), ".codex-code-session", "config.json"));
+  assert.equal(DEFAULT_CONFIG_PATH, path.join(os.homedir(), ".agent-session", "codex.json"));
 });
 
 test("lists sessions for a cwd from Codex jsonl files", () => {
@@ -158,8 +158,9 @@ test("renders Codex picker titles without changing picker behavior", () => {
     now: new Date("2026-04-29T16:00:00.000Z"),
   });
 
-  assert.match(output, /Codex sessions/);
-  assert.match(output, /> 1\. 019dd9bd/);
+  assert.match(output, /^Codex sessions  019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4$/m);
+  assert.match(output, /> 1\. 1小时前/);
+  assert.doesNotMatch(output, /019dd9bd  /);
 });
 
 test("renders Codex workspace picker title", () => {
