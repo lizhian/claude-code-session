@@ -44,6 +44,9 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 common_source_dir="$script_dir/common"
+claude_source_dir="$script_dir/claude"
+codex_source_dir="$script_dir/codex"
+opencode_source_dir="$script_dir/opencode"
 claude_source_script="$script_dir/claude/claude-sessions.js"
 codex_source_script="$script_dir/codex/codex-sessions.js"
 opencode_source_script="$script_dir/opencode/opencode-sessions.js"
@@ -85,19 +88,19 @@ cp "$common_source_dir"/*.js "$common_install_dir/"
 
 if [[ "$has_claude" == true ]]; then
   mkdir -p "$claude_install_dir"
-  cp "$claude_source_script" "$installed_script"
+  cp "$claude_source_dir"/*.js "$claude_install_dir/"
   chmod 755 "$installed_script"
 fi
 
 if [[ "$has_codex" == true ]]; then
   mkdir -p "$codex_install_dir"
-  cp "$codex_source_script" "$codex_installed_script"
+  cp "$codex_source_dir"/*.js "$codex_install_dir/"
   chmod 755 "$codex_installed_script"
 fi
 
 if [[ "$has_opencode" == true ]]; then
   mkdir -p "$opencode_install_dir"
-  cp "$opencode_source_script" "$opencode_installed_script"
+  cp "$opencode_source_dir"/*.js "$opencode_install_dir/"
   chmod 755 "$opencode_installed_script"
 fi
 touch "$shell_rc"

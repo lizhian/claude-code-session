@@ -206,8 +206,11 @@ function createSessionPicker({
   filterSessions,
   renderInteractivePicker,
   renderWorkspacePicker,
+  renderConfigurationPicker = ({ title = "Configurations", emptyMessage = "No configurations." }) => `${title}\n\n${emptyMessage}`,
   workspaceCwd,
   loadSessionTranscript,
+  configurationTitle = "Configurations",
+  configurationActions = [],
   permissionModes = DEFAULT_PERMISSION_MODES,
 }) {
   const pickerPermissionModes = supportedPermissionModes(permissionModes);
@@ -234,6 +237,11 @@ function createSessionPicker({
     let workspaceQuery = "";
     let sessionSelectedIndex = 0;
     let workspaceSelectedIndex = 0;
+    let configurationSelectedIndex = 0;
+    let configurationItemSelectedIndex = 0;
+    let activeConfigurationAction = null;
+    let configurationItems = [];
+    let configurationStatus = "";
     let previousQueryHadText = false;
     let previewTranscript = null;
     let previewError = "";
@@ -275,6 +283,18 @@ function createSessionPicker({
         previewError = "";
       }
 
+      function loadConfigurationItems(action) {
+        if (!action || typeof action.loadItems !== "function") {
+          return [];
+        }
+
+        return action.loadItems({
+          cwd: currentCwd,
+          dataHome,
+          homeOptionName,
+        }) || [];
+      }
+
       function enterPreview(item) {
         if (!item || item.type !== "session") {
           return;
@@ -306,6 +326,47 @@ function createSessionPicker({
               workspaces: workspaces || [],
               query: workspaceQuery,
               selectedIndex: workspaceSelectedIndex,
+              rows: output.rows || 24,
+              columns: output.columns || 100,
+              color: io.color ?? true,
+            }),
+          );
+          return;
+        }
+
+        if (view === "configurations") {
+          const items = configurationActions.map((action) => ({
+            ...action,
+            name: action.name || action.label,
+          }));
+          configurationSelectedIndex = clampSelectedIndex(configurationSelectedIndex, items.length);
+          output.write(
+            renderConfigurationPicker({
+              title: configurationTitle,
+              items,
+              selectedIndex: configurationSelectedIndex,
+              status: configurationStatus,
+              rows: output.rows || 24,
+              columns: output.columns || 100,
+              color: io.color ?? true,
+            }),
+          );
+          return;
+        }
+
+        if (view === "configurationItems") {
+          configurationItemSelectedIndex = clampSelectedIndex(configurationItemSelectedIndex, configurationItems.length);
+          output.write(
+            renderConfigurationPicker({
+              title: activeConfigurationAction && activeConfigurationAction.title
+                ? activeConfigurationAction.title
+                : "Configurations",
+              items: configurationItems,
+              selectedIndex: configurationItemSelectedIndex,
+              status: configurationStatus,
+              emptyMessage: activeConfigurationAction && activeConfigurationAction.emptyMessage
+                ? activeConfigurationAction.emptyMessage
+                : "No configurations.",
               rows: output.rows || 24,
               columns: output.columns || 100,
               color: io.color ?? true,
@@ -367,12 +428,65 @@ function createSessionPicker({
             render();
             return;
           }
+          if (view === "configurationItems") {
+            view = "configurations";
+            activeConfigurationAction = null;
+            configurationItems = [];
+            render();
+            return;
+          }
+          if (view === "configurations") {
+            view = "workspaces";
+            render();
+            return;
+          }
           cleanup();
           resolve(null);
           return;
         }
 
         if (key.name === "return" || key.name === "enter") {
+          if (view === "configurations") {
+            const action = configurationActions[clampSelectedIndex(configurationSelectedIndex, configurationActions.length)];
+            if (!action) {
+              return;
+            }
+            activeConfigurationAction = action;
+            configurationItemSelectedIndex = 0;
+            try {
+              configurationItems = loadConfigurationItems(action);
+              configurationStatus = "";
+              view = "configurationItems";
+            } catch (error) {
+              configurationItems = [];
+              configurationStatus = error && error.message ? error.message : String(error);
+            }
+            render();
+            return;
+          }
+
+          if (view === "configurationItems") {
+            const item = configurationItems[clampSelectedIndex(configurationItemSelectedIndex, configurationItems.length)];
+            if (!item || !activeConfigurationAction || typeof activeConfigurationAction.applyItem !== "function") {
+              return;
+            }
+            try {
+              const result = activeConfigurationAction.applyItem(item, {
+                cwd: currentCwd,
+                dataHome,
+                homeOptionName,
+              }) || {};
+              configurationStatus = result.status || `Selected ${item.label || item.name || "configuration"}.`;
+              view = "configurations";
+              activeConfigurationAction = null;
+              configurationItems = [];
+            } catch (error) {
+              configurationStatus = error && error.message ? error.message : String(error);
+            }
+            render();
+            return;
+          }
+
           if (view === "workspaces") {
             const items = currentWorkspaceItems();
             const item = items[clampSelectedIndex(workspaceSelectedIndex, items.length)];
@@ -418,6 +532,9 @@ function createSessionPicker({
         }
 
         if (key.name === "tab") {
+          if (view !== "sessions") {
+            return;
+          }
           permissionMode = nextPermissionMode(permissionMode, pickerPermissionModes);
           savePermissionMode(permissionMode, launchConfigPath, pickerPermissionModes);
           render();
@@ -435,6 +552,14 @@ function createSessionPicker({
           return;
         }
 
+        if (key.name === "right" && view === "workspaces") {
+          view = "configurations";
+          configurationSelectedIndex = 0;
+          configurationStatus = "";
+          render();
+          return;
+        }
+
         if (key.name === "left" && view === "workspaces") {
           view = "sessions";
           previousQueryHadText = Boolean(sessionQuery);
@@ -442,9 +567,27 @@ function createSessionPicker({
           return;
         }
 
+        if (key.name === "left" && view === "configurations") {
+          view = "workspaces";
+          render();
+          return;
+        }
+
+        if (key.name === "left" && view === "configurationItems") {
+          view = "configurations";
+          activeConfigurationAction = null;
+          configurationItems = [];
+          render();
+          return;
+        }
+
         if (key.name === "up") {
           if (view === "workspaces") {
             workspaceSelectedIndex = Math.max(0, workspaceSelectedIndex - 1);
+          } else if (view === "configurations") {
+            configurationSelectedIndex = Math.max(0, configurationSelectedIndex - 1);
+          } else if (view === "configurationItems") {
+            configurationItemSelectedIndex = Math.max(0, configurationItemSelectedIndex - 1);
           } else {
             sessionSelectedIndex = Math.max(0, sessionSelectedIndex - 1);
           }
@@ -458,6 +601,16 @@ function createSessionPicker({
               Math.max(0, currentWorkspaceItems().length - 1),
               workspaceSelectedIndex + 1,
             );
+          } else if (view === "configurations") {
+            configurationSelectedIndex = Math.min(
+              Math.max(0, configurationActions.length - 1),
+              configurationSelectedIndex + 1,
+            );
+          } else if (view === "configurationItems") {
+            configurationItemSelectedIndex = Math.min(
+              Math.max(0, configurationItems.length - 1),
+              configurationItemSelectedIndex + 1,
+            );
           } else {
             sessionSelectedIndex = Math.min(
               Math.max(0, currentSessionItems().length - 1),
@@ -469,6 +622,9 @@ function createSessionPicker({
         }
 
         if (key.name === "backspace" || key.name === "delete") {
+          if (view === "configurations" || view === "configurationItems") {
+            return;
+          }
           if (view === "workspaces") {
             workspaceQuery = workspaceQuery.slice(0, -1);
           } else {
@@ -488,6 +644,9 @@ function createSessionPicker({
         }
 
         if (str && str >= " " && !key.ctrl && !key.meta) {
+          if (view === "configurations" || view === "configurationItems") {
+            return;
+          }
           if (view === "workspaces") {
             workspaceQuery += str;
             if (!previousQueryHadText && filterWorkspaces(workspaces || [], workspaceQuery).length > 0) {

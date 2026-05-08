@@ -616,12 +616,60 @@ function renderWorkspacePicker(options) {
   return lines.join("\n");
 }
 
+function renderConfigurationPicker(options) {
+  const title = options.title || "Configurations";
+  const items = options.items || [];
+  const rows = options.rows || process.stdout.rows || 24;
+  const columns = options.columns || process.stdout.columns || 100;
+  const useColor = options.color === true;
+  const selectedIndex = clampSelectedIndex(options.selectedIndex || 0, items.length);
+  const maxItemRows = Math.max(1, rows - 6);
+  const start = Math.max(0, Math.min(selectedIndex - maxItemRows + 1, items.length - maxItemRows));
+  const visibleItems = items.slice(start, start + maxItemRows);
+  const numberWidth = Math.max(2, displayWidth(`${Math.max(0, items.length - 1)}.`));
+  const lines = [
+    fitLine(title, columns),
+  ];
+
+  if (options.status) {
+    lines.push(fitLine(options.status, columns));
+  }
+
+  lines.push("");
+
+  visibleItems.forEach((item, visibleOffset) => {
+    const itemIndex = start + visibleOffset;
+    const prefix = itemIndex === selectedIndex ? "> " : "  ";
+    const number = `${itemIndex}.`;
+    const label = item.label || item.name || "-";
+    const details = [];
+
+    if (item.description) {
+      details.push(item.description);
+    }
+    if (item.config && Object.hasOwn(item.config, "base_url")) {
+      details.push(item.config.base_url);
+    }
+
+    const detailsText = details.length > 0 ? `  ${details.join("  ")}` : "";
+    const line = fitLine(`${prefix}${padDisplay(number, numberWidth, "right")} ${label}${detailsText}`, columns);
+    lines.push(itemIndex === selectedIndex ? colorize(line, ANSI.selectedSession, useColor) : line);
+  });
+
+  if (items.length === 0) {
+    lines.push(options.emptyMessage || "No configurations.");
+  }
+
+  return lines.join("\n");
+}
+
 module.exports = {
   displayWidth,
   filterSessions,
   formatPicker,
   formatSessionTime,
   formatSessions,
+  renderConfigurationPicker,
   renderInteractivePicker,
   renderWorkspacePicker,
   truncateToWidth,

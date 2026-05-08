@@ -35,9 +35,12 @@ if ($HasOpenCode -and -not (Get-Command sqlite3 -ErrorAction SilentlyContinue)) 
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $CommonSourceDir = Join-Path $ScriptDir "common"
-$SourceScript = Join-Path (Join-Path $ScriptDir "claude") "claude-sessions.js"
-$CodexSourceScript = Join-Path (Join-Path $ScriptDir "codex") "codex-sessions.js"
-$OpenCodeSourceScript = Join-Path (Join-Path $ScriptDir "opencode") "opencode-sessions.js"
+$ClaudeSourceDir = Join-Path $ScriptDir "claude"
+$CodexSourceDir = Join-Path $ScriptDir "codex"
+$OpenCodeSourceDir = Join-Path $ScriptDir "opencode"
+$SourceScript = Join-Path $ClaudeSourceDir "claude-sessions.js"
+$CodexSourceScript = Join-Path $CodexSourceDir "codex-sessions.js"
+$OpenCodeSourceScript = Join-Path $OpenCodeSourceDir "opencode-sessions.js"
 $InstallDir = Join-Path $HOME ".agent-session"
 $CommonInstallDir = Join-Path $InstallDir "common"
 $ClaudeInstallDir = Join-Path $InstallDir "claude"
@@ -72,17 +75,17 @@ Copy-Item -Path (Join-Path $CommonSourceDir "*.js") -Destination $CommonInstallD
 
 if ($HasClaude) {
   New-Item -ItemType Directory -Path $ClaudeInstallDir -Force | Out-Null
-  Copy-Item -Path $SourceScript -Destination $InstalledScript -Force
+  Copy-Item -Path (Join-Path $ClaudeSourceDir "*.js") -Destination $ClaudeInstallDir -Force
 }
 
 if ($HasCodex) {
   New-Item -ItemType Directory -Path $CodexInstallDir -Force | Out-Null
-  Copy-Item -Path $CodexSourceScript -Destination $CodexInstalledScript -Force
+  Copy-Item -Path (Join-Path $CodexSourceDir "*.js") -Destination $CodexInstallDir -Force
 }
 
 if ($HasOpenCode) {
   New-Item -ItemType Directory -Path $OpenCodeInstallDir -Force | Out-Null
-  Copy-Item -Path $OpenCodeSourceScript -Destination $OpenCodeInstalledScript -Force
+  Copy-Item -Path (Join-Path $OpenCodeSourceDir "*.js") -Destination $OpenCodeInstallDir -Force
 }
 
 $ProfilePath = $PROFILE.CurrentUserAllHosts

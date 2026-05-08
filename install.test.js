@@ -76,6 +76,7 @@ test("install script copies the picker and adds a zsh alias", () => {
   const installedUtilsScript = path.join(installDir, "common", "session-utils.js");
   const installedRendererScript = path.join(installDir, "common", "session-renderer.js");
   const installedCodexScript = path.join(installDir, "codex", "codex-sessions.js");
+  const installedCodexProvidersScript = path.join(installDir, "codex", "codex-model-providers.js");
   const installedOpenCodeScript = path.join(installDir, "opencode", "opencode-sessions.js");
   const zshrc = fs.readFileSync(path.join(home, ".zshrc"), "utf8");
 
@@ -84,6 +85,7 @@ test("install script copies the picker and adds a zsh alias", () => {
   assert.equal(fs.existsSync(installedUtilsScript), true);
   assert.equal(fs.existsSync(installedRendererScript), true);
   assert.equal(fs.existsSync(installedCodexScript), true);
+  assert.equal(fs.existsSync(installedCodexProvidersScript), true);
   assert.equal(fs.existsSync(installedOpenCodeScript), true);
   assert.equal(fs.statSync(installedScript).mode & 0o111, 0o111);
   assert.equal(fs.statSync(installedCodexScript).mode & 0o111, 0o111);

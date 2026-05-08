@@ -8,6 +8,7 @@ const {
   filterSessions,
   formatPicker,
   formatSessions: formatProviderSessions,
+  renderConfigurationPicker: renderProviderConfigurationPicker,
   renderInteractivePicker: renderProviderInteractivePicker,
   renderWorkspacePicker: renderProviderWorkspacePicker,
 } = require("../common/session-renderer");
@@ -19,6 +20,10 @@ const {
 } = require("../common/session-utils");
 const { pickAndRunProvider, runProviderCli } = require("../common/provider-runner");
 const { normalizeTranscriptMessages } = require("../common/session-transcript");
+const {
+  loadModelProviders,
+  selectModelProvider,
+} = require("./codex-model-providers");
 
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-session", "codex.json");
 
@@ -247,6 +252,10 @@ function renderWorkspacePicker(options = {}) {
   return renderProviderWorkspacePicker({ ...options, title: "Codex workspaces" });
 }
 
+function renderConfigurationPicker(options = {}) {
+  return renderProviderConfigurationPicker(options);
+}
+
 function formatSessions(sessions) {
   return formatProviderSessions(sessions, { providerName: "Codex" });
 }
@@ -324,8 +333,26 @@ const pickSessionInteractive = createSessionPicker({
   filterSessions,
   renderInteractivePicker,
   renderWorkspacePicker,
+  renderConfigurationPicker,
   workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
   loadSessionTranscript,
+  configurationTitle: "Codex configurations",
+  configurationActions: [
+    {
+      name: "Model provider",
+      title: "Codex model providers",
+      loadItems: ({ dataHome }) => loadModelProviders(dataHome).providers,
+      applyItem: (item, { dataHome }) => {
+        const result = selectModelProvider(item.name, dataHome);
+        return {
+          status: result.sameProvider
+            ? `Updated model provider auth: ${item.name}`
+            : `Selected model provider: ${item.name}`,
+        };
+      },
+      emptyMessage: "No model providers.",
+    },
+  ],
 });
 
 const codexProvider = {
@@ -407,7 +434,7 @@ function usage() {
     "Usage: node codex/codex-sessions.js [--json | --pick] [--cwd <path>] [--codex-home <path>]",
     "",
     "获取指定目录对应的 Codex sessions。默认读取当前目录和 ~/.codex。",
-    "交互模式快捷键：Tab 切换 default/auto/full permission，→ 选择 Codex 工作区，← 返回 session 列表。",
+    "交互模式快捷键：Tab 切换 default/auto/full permission，→ 选择 Codex 工作区；在工作区列表中 → 进入 configurations，Enter 进入选中工作区的 sessions。",
     "权限模式会自动记住，配置保存在 ~/.agent-session/codex.json。",
     "",
     "Options:",
@@ -456,6 +483,7 @@ module.exports = {
   parseArgs,
   pickAndRunCodex,
   renderInteractivePicker,
+  renderConfigurationPicker,
   renderWorkspacePicker,
   summarizeSession,
 };

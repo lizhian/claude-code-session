@@ -16,9 +16,8 @@ Interactive session pickers for Claude Code, Codex, and OpenCode. Claude Code us
 - Switch between permission modes.
 - Remember the last selected permission mode.
 - Use zero-based picker numbering: `0` creates a new session, `1` resumes the first existing match.
-- Browse existing Claude Code workspaces with the right arrow key.
-- Browse existing Codex sessions and workspaces with the same picker behavior.
-- Browse existing OpenCode sessions and workspaces with the same picker behavior.
+- Browse existing Claude Code, Codex, and OpenCode workspaces with the right arrow key.
+- Open Codex configuration actions from the workspace list.
 
 ## Requirements
 
@@ -83,10 +82,11 @@ Interactive controls:
 
 - Type to search.
 - Up/down arrows move the selection.
-- Enter opens the selected item.
+- Enter opens the selected session or workspace.
 - `Tab` switches permission mode.
 - Right arrow opens workspace selection.
-- Left arrow returns to the session list.
+- In Codex workspace selection, right arrow opens configurations and `Model provider` switches the global Codex model provider from `~/.codex/config.toml`.
+- Left arrow returns to the previous picker view.
 - `Esc` or `Ctrl-C` cancels.
 
 Picker numbering starts at `0`: choose `0` or press Enter at the prompt to create a new session; choose `1` or above to resume an existing session.
@@ -115,6 +115,8 @@ The selected Codex permission mode is saved to:
 ```bash
 ~/.agent-session/codex.json
 ```
+
+Codex model provider selection is saved in `~/.codex/config.toml` as `model_provider_selected`. Before switching providers, the picker backs up the current `~/.codex/auth.json` into the previous provider's `auth_json`. If no previous provider is known, it creates an `unknown-YYYYMMDD-HHmmss` provider with `name` and `auth_json` so current tokens are not lost.
 
 The selected OpenCode permission mode is saved to:
 

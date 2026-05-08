@@ -25,6 +25,7 @@ const {
   listSessions,
 } = require("./claude/claude-sessions");
 const { createSessionPicker } = require("./common/session-utils");
+const { renderConfigurationPicker } = require("./common/session-renderer");
 const { normalizeTranscriptMessages } = require("./common/session-transcript");
 
 test("stores default config under the install directory", () => {
@@ -622,6 +623,107 @@ test("preview rendering clears scrollback so previous session messages are remov
   input.emit("keypress", "", { name: "escape" });
   const result = await picked;
   assert.equal(result, null);
+});
+
+test("workspace right arrow opens configurations and enter applies a configuration item", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let rendered = "";
+  const applied = [];
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+  output.on("data", (chunk) => {
+    rendered += chunk.toString("utf8");
+  });
+
+  const sessions = [
+    {
+      id: "11111111-2222-3333-4444-555555555555",
+      messageCount: 1,
+      cwd: "/tmp/payment-api",
+    },
+  ];
+  const picker = createSessionPicker({
+    configPath: path.join(os.tmpdir(), "agent-session-configurations-test.json"),
+    defaultHome: () => os.tmpdir(),
+    homeOptionName: "claudeHome",
+    listSessions: ({ cwd }) => sessions.map((session) => ({ ...session, cwd })),
+    listWorkspaces: () => [
+      {
+        cwd: "/tmp/payment-api",
+        sessionCount: 1,
+        messageCount: 1,
+      },
+    ],
+    filterSessions,
+    renderInteractivePicker,
+    renderWorkspacePicker,
+    renderConfigurationPicker,
+    workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
+    configurationTitle: "Test configurations",
+    configurationActions: [
+      {
+        name: "Model provider",
+        title: "Test model providers",
+        loadItems: () => [
+          { name: "openai", selected: true },
+          { name: "custom", config: { base_url: "https://api.example.com/v1" } },
+        ],
+        applyItem: (item) => {
+          applied.push(item.name);
+          return { status: `Selected model provider: ${item.name}` };
+        },
+      },
+    ],
+  });
+  const picked = picker(sessions, {
+    input,
+    output,
+    cwd: "/tmp/payment-api",
+    claudeHome: os.tmpdir(),
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(rendered, /Claude Code workspaces/);
+
+  rendered = "";
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(rendered, /Test configurations/);
+  assert.match(rendered, /> 0\. Model provider/);
+
+  rendered = "";
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(rendered, /Test model providers/);
+  assert.match(rendered, /> 0\. openai/);
+  assert.doesNotMatch(rendered, /current/);
+
+  rendered = "";
+  input.emit("keypress", "", { name: "down" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(applied, ["custom"]);
+  assert.match(rendered, /Test configurations/);
+  assert.match(rendered, /Selected model provider: custom/);
+
+  rendered = "";
+  input.emit("keypress", "", { name: "escape" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(rendered, /Claude Code workspaces/);
+
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  const result = await picked;
+  assert.equal(result.cwd, "/tmp/payment-api");
+  assert.equal(result.item.type, "new");
 });
 
 test("renders picker status fields in fixed columns", () => {
