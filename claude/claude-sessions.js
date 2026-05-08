@@ -20,10 +20,23 @@ const {
   formatPicker,
   formatSessionTime,
   formatSessions: formatProviderSessions,
+  renderConfigurationPicker: renderProviderConfigurationPicker,
   renderInteractivePicker: renderProviderInteractivePicker,
   renderWorkspacePicker: renderProviderWorkspacePicker,
   truncateToWidth,
 } = require("../common/session-renderer");
+const {
+  MODEL_FIELDS,
+  activeModelValue,
+  claudeSettingsPath,
+  loadClaudeModelChoices,
+  loadClaudeModelProviders,
+  loadClaudePermissionMode,
+  readClaudeSettings,
+  saveClaudeModel,
+  saveClaudePermissionMode,
+  selectClaudeModelProvider,
+} = require("./claude-model-providers");
 
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-session", "claude-code.json");
 
@@ -49,6 +62,17 @@ function loadLaunchMode(configPath = DEFAULT_CONFIG_PATH) {
 
 function saveLaunchMode(launchMode, configPath = DEFAULT_CONFIG_PATH) {
   savePermissionMode(launchMode, configPath);
+}
+
+function loadNativePermissionMode(options = {}, permissionModes) {
+  return normalizePermissionMode(loadClaudePermissionMode(options.claudeHome || defaultClaudeHome()), permissionModes);
+}
+
+function saveNativePermissionMode(permissionMode, options = {}, permissionModes) {
+  saveClaudePermissionMode(
+    normalizePermissionMode(permissionMode, permissionModes),
+    options.claudeHome || options.dataHome || defaultClaudeHome(),
+  );
 }
 
 function textFromContent(content) {
@@ -238,6 +262,27 @@ function renderWorkspacePicker(options) {
   return renderProviderWorkspacePicker({ ...options, title: "Claude Code workspaces" });
 }
 
+function renderConfigurationPicker(options = {}) {
+  return renderProviderConfigurationPicker(options);
+}
+
+function currentClaudeModelColumn(fieldName, dataHome) {
+  try {
+    return [activeModelValue(readClaudeSettings(claudeSettingsPath(dataHome)), fieldName)];
+  } catch {
+    return [""];
+  }
+}
+
+function currentClaudeProviderColumn(dataHome) {
+  try {
+    const settings = readClaudeSettings(claudeSettingsPath(dataHome));
+    return [typeof settings.model_provider_selected === "string" ? settings.model_provider_selected : ""];
+  } catch {
+    return [""];
+  }
+}
+
 function launchArgs(permissionMode) {
   const mode = normalizePermissionMode(permissionMode);
   if (mode === "auto") {
@@ -299,8 +344,69 @@ const pickSessionInteractive = createSessionPicker({
   filterSessions,
   renderInteractivePicker,
   renderWorkspacePicker,
+  renderConfigurationPicker,
   workspaceCwd: (workspace, currentCwd) => workspace.cwd || workspace.projectDir || currentCwd,
   loadSessionTranscript,
+  loadPermissionMode: (context, permissionModes) => loadNativePermissionMode(
+    { claudeHome: context.dataHome },
+    permissionModes,
+  ),
+  savePermissionMode: (permissionMode, context, permissionModes) => saveNativePermissionMode(
+    permissionMode,
+    { claudeHome: context.dataHome },
+    permissionModes,
+  ),
+  configurationTitle: "Claude Code configurations",
+  configurationActions: [
+    {
+      name: "Model provider",
+      title: "Claude Code model providers",
+      columns: ({ dataHome }) => currentClaudeProviderColumn(dataHome),
+      loadItems: ({ dataHome }) => loadClaudeModelProviders(dataHome).providers,
+      applyItem: (item, { dataHome }) => {
+        const result = selectClaudeModelProvider(item.name, dataHome);
+        return {
+          status: result.sameProvider
+            ? `Updated model provider env: ${item.name}`
+            : `Selected model provider: ${item.name}`,
+        };
+      },
+      emptyMessage: "No model providers.",
+    },
+    {
+      name: "Opus model",
+      title: "Claude Code Opus model",
+      columns: ({ dataHome }) => currentClaudeModelColumn(MODEL_FIELDS.opus, dataHome),
+      loadItems: ({ dataHome }) => loadClaudeModelChoices(MODEL_FIELDS.opus, { claudeHome: dataHome }),
+      applyItem: (item, { dataHome }) => {
+        const result = saveClaudeModel(MODEL_FIELDS.opus, item.name, { claudeHome: dataHome });
+        return { status: `Updated Opus model: ${result.value}` };
+      },
+      emptyMessage: "No models.",
+    },
+    {
+      name: "Sonnet model",
+      title: "Claude Code Sonnet model",
+      columns: ({ dataHome }) => currentClaudeModelColumn(MODEL_FIELDS.sonnet, dataHome),
+      loadItems: ({ dataHome }) => loadClaudeModelChoices(MODEL_FIELDS.sonnet, { claudeHome: dataHome }),
+      applyItem: (item, { dataHome }) => {
+        const result = saveClaudeModel(MODEL_FIELDS.sonnet, item.name, { claudeHome: dataHome });
+        return { status: `Updated Sonnet model: ${result.value}` };
+      },
+      emptyMessage: "No models.",
+    },
+    {
+      name: "Haiku model",
+      title: "Claude Code Haiku model",
+      columns: ({ dataHome }) => currentClaudeModelColumn(MODEL_FIELDS.haiku, dataHome),
+      loadItems: ({ dataHome }) => loadClaudeModelChoices(MODEL_FIELDS.haiku, { claudeHome: dataHome }),
+      applyItem: (item, { dataHome }) => {
+        const result = saveClaudeModel(MODEL_FIELDS.haiku, item.name, { claudeHome: dataHome });
+        return { status: `Updated Haiku model: ${result.value}` };
+      },
+      emptyMessage: "No models.",
+    },
+  ],
 });
 
 const claudeProvider = {
@@ -309,6 +415,7 @@ const claudeProvider = {
   homeOptionName: "claudeHome",
   listSessions,
   pickSessionInteractive,
+  loadPermissionMode: loadNativePermissionMode,
   selectedItemToCommand,
   buildCommandFromChoice: buildClaudeCommand,
   trustCurrentFolder: (cwd) => markProjectTrusted(cwd),
@@ -381,8 +488,8 @@ function usage() {
     "Usage: node claude/claude-sessions.js [--json | --pick] [--cwd <path>] [--claude-home <path>]",
     "",
     "获取指定目录对应的 Claude Code sessions。默认读取当前目录和 ~/.claude。",
-    "交互模式快捷键：Tab 切换 default/auto/full permission，→ 选择 Claude Code 工作区，← 返回 session 列表。",
-    "权限模式会自动记住，配置保存在 ~/.agent-session/claude-code.json。",
+    "交互模式快捷键：Tab 切换 default/auto/full permission，→ 选择 Claude Code 工作区；在工作区列表中 → 进入 configurations，Enter 进入选中工作区的 sessions。",
+    "权限模式会自动记住，配置保存在 ~/.claude/settings.json 的 permission_mode_selected。",
     "",
     "Options:",
     "  --json                 输出 JSON，方便 jq 或其他脚本处理",
@@ -439,6 +546,7 @@ module.exports = {
   promptTextFromRecord,
   pickAndRunClaude,
   renderInteractivePicker,
+  renderConfigurationPicker,
   renderWorkspacePicker,
   saveLaunchMode,
   savePermissionMode,

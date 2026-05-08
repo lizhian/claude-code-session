@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { PassThrough } = require("node:stream");
 const test = require("node:test");
 
 const {
@@ -13,6 +14,7 @@ const {
   listWorkspaces,
   markProjectTrusted,
   parseArgs,
+  pickAndRunCodex,
   renderInteractivePicker,
   renderWorkspacePicker,
 } = require("./codex/codex-sessions");
@@ -228,6 +230,73 @@ test("renders Codex workspace picker title", () => {
   });
 
   assert.match(output, /Codex workspaces/);
+});
+
+test("Codex configurations show the current model provider", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-configurations-provider-"));
+  const codexHome = path.join(tempDir, ".codex");
+  const cwd = path.join(tempDir, "payment-api");
+  const sessionDir = path.join(codexHome, "sessions", "2026", "04", "29");
+  const sessionId = "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4";
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let rendered = "";
+
+  writeCodexSession(path.join(sessionDir, `rollout-2026-04-29T22-56-25-${sessionId}.jsonl`), {
+    id: sessionId,
+    cwd,
+    startedAt: "2026-04-29T14:56:25.542Z",
+    updatedAt: "2026-04-29T15:00:00.000Z",
+    firstPrompt: "first prompt",
+    lastPrompt: "last prompt",
+  });
+  fs.writeFileSync(
+    path.join(codexHome, "config.toml"),
+    [
+      "model_provider_selected = \"axonhub\"",
+      "",
+      "[model_providers.axonhub]",
+      "name = \"axonhub\"",
+      "base_url = \"https://api.example.com/v1\"",
+      "",
+    ].join("\n"),
+  );
+
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+  output.on("data", (chunk) => {
+    rendered += chunk.toString("utf8");
+  });
+
+  const sessions = listSessions({ cwd, codexHome });
+  const picker = pickAndRunCodex(sessions, {
+    input,
+    output,
+    cwd,
+    codexHome,
+    configPath: path.join(tempDir, "picker.json"),
+    runCommand: () => {},
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+  rendered = "";
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.match(rendered, /Codex configurations/);
+  assert.match(rendered, /> 0\. Model provider\s+axonhub/);
+
+  input.emit("keypress", "", { name: "escape" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  await picker;
 });
 
 test("parses Codex-specific home option", () => {

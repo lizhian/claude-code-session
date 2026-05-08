@@ -199,6 +199,29 @@ function loadConfiguredModelChoices(fieldName, configPath = defaultOpenCodeConfi
   return configuredModelChoices(readOpenCodeConfig(configPath), fieldName);
 }
 
+function loadConfiguredModelValue(fieldName, configPath = defaultOpenCodeConfigPath()) {
+  if (fieldName !== "model" && fieldName !== "small_model") {
+    throw new Error(`unsupported OpenCode model field: ${fieldName}`);
+  }
+
+  const config = readOpenCodeConfig(configPath);
+  return typeof config[fieldName] === "string" ? config[fieldName] : "";
+}
+
+function loadOpenCodePermissionMode(configPath = defaultOpenCodeConfigPath()) {
+  if (!fs.existsSync(configPath)) {
+    return "";
+  }
+  const config = readOpenCodeConfig(configPath);
+  return typeof config.permission_mode_selected === "string" ? config.permission_mode_selected : "";
+}
+
+function saveOpenCodePermissionMode(permissionMode, configPath = defaultOpenCodeConfigPath()) {
+  const config = fs.existsSync(configPath) ? readOpenCodeConfig(configPath) : {};
+  config.permission_mode_selected = permissionMode;
+  writeOpenCodeConfig(config, configPath);
+}
+
 async function fetchRemoteModelNames(provider, options = {}) {
   const providerOptions = provider && provider.options && typeof provider.options === "object" ? provider.options : {};
   const baseURL = providerOptions.baseURL;
@@ -361,10 +384,13 @@ module.exports = {
   fetchRemoteModelNamesWithFallback,
   loadAiSdkProviders,
   loadConfiguredModelChoices,
+  loadConfiguredModelValue,
+  loadOpenCodePermissionMode,
   loadProviderModels,
   parseJsonc,
   readOpenCodeConfig,
   saveConfiguredModel,
+  saveOpenCodePermissionMode,
   saveProviderModels,
   stripJsonComments,
   stripTrailingCommas,

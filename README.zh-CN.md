@@ -89,6 +89,7 @@ oc
 - 回车打开选中的 session 或 workspace。
 - `Tab` 切换权限模式。
 - 右方向键进入工作区选择。
+- 在 Claude Code 工作区列表中，右方向键进入 configurations。`Model provider` 会从 `~/.claude/settings.json` 切换当前 provider，`Opus model`、`Sonnet model` 和 `Haiku model` 会更新 Claude 默认模型 env 字段。
 - 在 Codex 工作区列表中，右方向键进入 configurations，`Model provider` 会从 `~/.codex/config.toml` 切换全局 Codex model provider。
 - 在 OpenCode 工作区列表中，右方向键进入 configurations。`Provider models` 会为 `@ai-sdk/*` providers 同步 model IDs，`Default model` 和 `Small model` 会更新 OpenCode 顶层 `model` 与 `small_model`。
 - 左方向键返回上一层 picker 视图。
@@ -116,38 +117,32 @@ oc
 
 OpenCode 当前只支持 default 和 full 权限模式。
 
-Claude 权限模式会自动记住，配置保存到：
+Claude Code 配置：
 
-```bash
-~/.agent-session/claude-code.json
-```
-
-Codex 权限模式会自动记住，配置保存到：
-
-```bash
-~/.agent-session/codex.json
-```
+- 读取 `~/.claude/settings.json`。
+- 使用顶层 `permission_mode_selected` 保存当前选择的权限模式。
+- 在 `Claude Code configurations` -> `Model provider` 中列出 `provider.<name>`。
+- 使用顶层 `model_provider_selected` 记录 picker 当前选择的 provider。
+- 切换 provider 前，先把 `env` 里的 provider 管理字段回写到上一个选中的 `provider.<name>`。
+- 把选中 provider 的 `ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_BASE_URL` 和 Haiku/Opus/Sonnet 默认模型字段同步到 `env`，同时保留其它无关 `env` 字段。
+- `Opus model`、`Sonnet model` 和 `Haiku model` 使用选中 provider 的 `ANTHROPIC_BASE_URL` 请求 `GET /v1/models`，并带上 `Authorization: Bearer {ANTHROPIC_AUTH_TOKEN}`，选择后同时更新 `env` 和 `provider.<model_provider_selected>`。
 
 Codex model provider 配置：
 
 - 读取 `~/.codex/config.toml`。
+- 使用顶层 `permission_mode_selected` 保存当前选择的权限模式。
 - 在 `Codex configurations` -> `Model provider` 中列出 `[model_providers.*]`。
 - 使用顶层 `model_provider_selected` 记录 picker 当前选择的 provider。
 - 切换 provider 前，先把当前 `~/.codex/auth.json` 回写到上一个 provider 的 `auth_json`。
 - 如果找不到上一个 provider，会创建一个 `unknown-YYYYMMDD-HHmmss` provider，并写入 `name` 和 `auth_json`，避免当前 token 丢失。
 - 目标 provider 有 `base_url` 时更新 Codex 原生顶层 `model_provider`；选择没有 `base_url` 的 provider 时删除 `model_provider`。
 
-OpenCode 权限模式会自动记住，配置保存到：
-
-```bash
-~/.agent-session/opencode.json
-```
-
 OpenCode 配置：
 
 - 读取 `~/.config/opencode/opencode.json`。
 - 支持带注释和尾随逗号的 JSONC 风格输入。
 - 写回时格式化为标准 JSON。
+- 使用顶层 `permission_mode_selected` 保存当前选择的权限模式。
 - `Provider models` 会列出带 `options.baseURL` 和 `options.apiKey` 的 `@ai-sdk/*` providers，使用 `GET {baseURL}/models` 拉取模型，并把选中的模型 ID 写入 `provider.<name>.models`。
 - 如果某个 provider 自己的模型接口返回空列表，会尝试使用同 origin、同 API key 的其它 provider 作为模型列表来源。
 - `Default model` 写入顶层 `model`，格式为 `provider/model`。
@@ -174,6 +169,7 @@ node opencode/opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-
 ## 项目结构
 
 - `claude/claude-sessions.js`：Claude Code session CLI。
+- `claude/claude-model-providers.js`：Claude Code model provider 选择和默认模型配置逻辑。
 - `codex/codex-sessions.js`：Codex session CLI。
 - `codex/codex-model-providers.js`：Codex model provider 配置解析、auth 备份和 provider 切换逻辑。
 - `opencode/opencode-sessions.js`：OpenCode session CLI，通过 `sqlite3` 读取 `opencode.db`。
@@ -189,7 +185,7 @@ node opencode/opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-
 
 - Claude、Codex 和 OpenCode 保持独立入口文件，避免不同 provider 的存储格式和启动参数互相影响。
 - 通用 picker 行为放在 `common/session-utils.js` 和 `common/session-renderer.js`；各 provider CLI 复用它们并传入自己的标题。
-- permission mode 按 provider 分别持久化到 `~/.agent-session`。
+- permission mode 按 provider 分别持久化到各自原生配置的 `permission_mode_selected`。
 - OpenCode full permission 通过 `OPENCODE_PERMISSION="allow"` 传入，因为 OpenCode TUI 当前没有对应的命令行 flag。
 
 ## 开发

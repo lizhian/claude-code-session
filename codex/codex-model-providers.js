@@ -87,6 +87,10 @@ function parseTopLevelModelProviderSelected(text) {
   return parseTopLevelStringField(text, "model_provider_selected");
 }
 
+function parseTopLevelPermissionModeSelected(text) {
+  return parseTopLevelStringField(text, "permission_mode_selected");
+}
+
 function parseTopLevelStringField(text, fieldName) {
   const lines = String(text || "").split(/\r?\n/);
   const topLevelEnd = lines.findIndex((line) => /^\s*\[/.test(line));
@@ -184,6 +188,20 @@ function loadModelProviders(codexHome = defaultCodexHome()) {
     modelProviderName: parsed.modelProviderName,
     selectedProviderName: parsed.selectedProviderName,
   };
+}
+
+function loadCodexPermissionMode(codexHome = defaultCodexHome()) {
+  const configPath = codexConfigPath(codexHome);
+  if (!fs.existsSync(configPath)) {
+    return "";
+  }
+  return parseTopLevelPermissionModeSelected(fs.readFileSync(configPath, "utf8"));
+}
+
+function saveCodexPermissionMode(permissionMode, codexHome = defaultCodexHome()) {
+  const configPath = codexConfigPath(codexHome);
+  const text = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf8") : "";
+  writeConfigText(configPath, setTopLevelStringField(text, "permission_mode_selected", permissionMode));
 }
 
 function readAuth(authPath) {
@@ -433,12 +451,15 @@ module.exports = {
   codexConfigPath,
   defaultCodexHome,
   loadModelProviders,
+  loadCodexPermissionMode,
   parseTopLevelModelProviderSelected,
+  parseTopLevelPermissionModeSelected,
   parseTableName,
   parseTomlProviders,
   parseTomlString,
   parseTopLevelModelProvider,
   readAuth,
+  saveCodexPermissionMode,
   selectModelProvider,
   setProviderAuthJsonText,
   setTopLevelStringField,

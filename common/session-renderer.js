@@ -11,6 +11,7 @@ const ANSI = {
   permissionFull: "\x1b[31m",
   previewMeta: "\x1b[36m",
   selectedSession: "\x1b[36m",
+  selectedConfiguration: "\x1b[34m",
 };
 
 function colorize(value, color, enabled) {
@@ -673,7 +674,11 @@ function renderConfigurationPicker(options) {
       `${prefix}${padDisplay(number, numberWidth, "right")} ${padDisplay(label, labelWidth)}${suffix ? `  ${suffix}` : ""}`,
       columns,
     );
-    lines.push(itemIndex === selectedIndex ? colorize(line, ANSI.selectedSession, useColor) : line);
+    if (item.checkable && item.selected) {
+      lines.push(colorize(line, ANSI.selectedConfiguration, useColor));
+    } else {
+      lines.push(itemIndex === selectedIndex ? colorize(line, ANSI.selectedSession, useColor) : line);
+    }
   });
 
   if (items.length === 0) {

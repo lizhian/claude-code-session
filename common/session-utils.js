@@ -212,6 +212,8 @@ function createSessionPicker({
   configurationTitle = "Configurations",
   configurationActions = [],
   permissionModes = DEFAULT_PERMISSION_MODES,
+  loadPermissionMode: loadPickerPermissionMode,
+  savePermissionMode: savePickerPermissionMode,
 }) {
   const pickerPermissionModes = supportedPermissionModes(permissionModes);
 
@@ -229,8 +231,32 @@ function createSessionPicker({
     let sessions = initialSessions || listSessions({ cwd: currentCwd, [homeOptionName]: dataHome });
     let workspaces = null;
     let view = "sessions";
+    function permissionContext() {
+      return {
+        cwd: currentCwd,
+        dataHome,
+        homeOptionName,
+        configPath: launchConfigPath,
+      };
+    }
+
+    function loadStoredPermissionMode() {
+      if (typeof loadPickerPermissionMode === "function") {
+        return loadPickerPermissionMode(permissionContext(), pickerPermissionModes);
+      }
+      return loadPermissionMode(launchConfigPath, pickerPermissionModes);
+    }
+
+    function saveStoredPermissionMode(nextMode) {
+      if (typeof savePickerPermissionMode === "function") {
+        savePickerPermissionMode(nextMode, permissionContext(), pickerPermissionModes);
+        return;
+      }
+      savePermissionMode(nextMode, launchConfigPath, pickerPermissionModes);
+    }
+
     let permissionMode = normalizePermissionMode(
-      io.permissionMode || io.launchMode || loadPermissionMode(launchConfigPath, pickerPermissionModes),
+      io.permissionMode || io.launchMode || loadStoredPermissionMode(),
       pickerPermissionModes,
     );
     let sessionQuery = "";
@@ -340,6 +366,13 @@ function createSessionPicker({
           const items = configurationActions.map((action) => ({
             ...action,
             name: action.name || action.label,
+            columns: typeof action.columns === "function"
+              ? action.columns({
+                  cwd: currentCwd,
+                  dataHome,
+                  homeOptionName,
+                })
+              : action.columns,
           }));
           configurationSelectedIndex = clampSelectedIndex(configurationSelectedIndex, items.length);
           output.write(
@@ -621,7 +654,7 @@ function createSessionPicker({
             return;
           }
           permissionMode = nextPermissionMode(permissionMode, pickerPermissionModes);
-          savePermissionMode(permissionMode, launchConfigPath, pickerPermissionModes);
+          saveStoredPermissionMode(permissionMode);
           render();
           return;
         }

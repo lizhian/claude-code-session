@@ -30,11 +30,18 @@ function trustCurrentFolder(provider, cwd, options) {
   }
 }
 
+function storedPermissionMode(provider, options, context, permissionModes) {
+  if (typeof provider.loadPermissionMode === "function") {
+    return provider.loadPermissionMode({ ...options, ...context }, permissionModes);
+  }
+  return loadPermissionMode(options.configPath || provider.configPath, permissionModes);
+}
+
 async function pickAndRunProvider(provider, sessions, options = {}) {
   const permissionModes = provider.permissionModes;
-  const configPath = options.configPath || provider.configPath;
+  const context = providerContext(provider, options);
   const permissionMode = normalizePermissionMode(
-    options.permissionMode || options.launchMode || loadPermissionMode(configPath, permissionModes),
+    options.permissionMode || options.launchMode || storedPermissionMode(provider, options, context, permissionModes),
     permissionModes,
   );
   const picked = await provider.pickSessionInteractive(sessions, options);

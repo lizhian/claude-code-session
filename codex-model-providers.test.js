@@ -6,10 +6,13 @@ const test = require("node:test");
 
 const {
   authFromProvider,
+  loadCodexPermissionMode,
   loadModelProviders,
   parseTomlProviders,
   parseTopLevelModelProvider,
   parseTopLevelModelProviderSelected,
+  parseTopLevelPermissionModeSelected,
+  saveCodexPermissionMode,
   selectModelProvider,
   unknownProviderName,
 } = require("./codex/codex-model-providers");
@@ -347,6 +350,30 @@ test("parses top-level model_provider_selected before other tables", () => {
     ),
     "custom",
   );
+});
+
+test("stores Codex permission mode in config.toml", () => {
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "codex-permission-mode-"));
+  writeConfig(
+    codexHome,
+    [
+      "model = \"gpt-5\"",
+      "",
+      "[model_providers.openai]",
+      "permission_mode_selected = \"ignored\"",
+      "",
+    ].join("\n"),
+  );
+
+  assert.equal(parseTopLevelPermissionModeSelected(fs.readFileSync(path.join(codexHome, "config.toml"), "utf8")), "");
+  assert.equal(loadCodexPermissionMode(codexHome), "");
+
+  saveCodexPermissionMode("auto", codexHome);
+  const config = fs.readFileSync(path.join(codexHome, "config.toml"), "utf8");
+
+  assert.match(config, /^permission_mode_selected = "auto"$/m);
+  assert.equal(loadCodexPermissionMode(codexHome), "auto");
+  assert.match(config, /\[model_providers\.openai\]\npermission_mode_selected = "ignored"/);
 });
 
 test("formats unknown provider names with local timestamps", () => {

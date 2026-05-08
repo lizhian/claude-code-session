@@ -23,8 +23,11 @@ const { normalizeTranscriptMessages } = require("../common/session-transcript");
 const {
   loadAiSdkProviders,
   loadConfiguredModelChoices,
+  loadConfiguredModelValue,
+  loadOpenCodePermissionMode,
   loadProviderModels,
   saveConfiguredModel,
+  saveOpenCodePermissionMode,
   saveProviderModels,
 } = require("./opencode-provider-models");
 
@@ -236,6 +239,25 @@ function renderConfigurationPicker(options = {}) {
   return renderProviderConfigurationPicker(options);
 }
 
+function currentOpenCodeModelColumn(fieldName) {
+  try {
+    return [loadConfiguredModelValue(fieldName)];
+  } catch {
+    return [""];
+  }
+}
+
+function loadNativePermissionMode(options = {}, permissionModes) {
+  return normalizePermissionMode(loadOpenCodePermissionMode(options.opencodeConfigPath), permissionModes);
+}
+
+function saveNativePermissionMode(permissionMode, options = {}, permissionModes) {
+  saveOpenCodePermissionMode(
+    normalizePermissionMode(permissionMode, permissionModes),
+    options.opencodeConfigPath,
+  );
+}
+
 function formatSessions(sessions) {
   return formatProviderSessions(sessions, { providerName: "OpenCode" });
 }
@@ -288,6 +310,8 @@ const pickSessionInteractive = createSessionPicker({
   workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
   permissionModes: OPENCODE_PERMISSION_MODES,
   loadSessionTranscript,
+  loadPermissionMode: (context, permissionModes) => loadNativePermissionMode({}, permissionModes),
+  savePermissionMode: (permissionMode, context, permissionModes) => saveNativePermissionMode(permissionMode, {}, permissionModes),
   configurationTitle: "OpenCode configurations",
   configurationActions: [
     {
@@ -307,6 +331,7 @@ const pickSessionInteractive = createSessionPicker({
     {
       name: "Default model",
       title: "OpenCode default model",
+      columns: () => currentOpenCodeModelColumn("model"),
       loadItems: () => loadConfiguredModelChoices("model"),
       applyItem: (item) => {
         const result = saveConfiguredModel("model", item.name);
@@ -317,6 +342,7 @@ const pickSessionInteractive = createSessionPicker({
     {
       name: "Small model",
       title: "OpenCode small model",
+      columns: () => currentOpenCodeModelColumn("small_model"),
       loadItems: () => loadConfiguredModelChoices("small_model"),
       applyItem: (item) => {
         const result = saveConfiguredModel("small_model", item.name);
@@ -334,6 +360,7 @@ const openCodeProvider = {
   permissionModes: OPENCODE_PERMISSION_MODES,
   listSessions,
   pickSessionInteractive,
+  loadPermissionMode: loadNativePermissionMode,
   selectedItemToCommand,
   buildCommandFromChoice: buildOpenCodeCommand,
   formatPicker,
@@ -405,7 +432,7 @@ function usage() {
     "",
     "获取指定目录对应的 OpenCode sessions。默认读取当前目录和 ~/.local/share/opencode。",
     "交互模式快捷键：Tab 切换 default/full permission，→ 选择 OpenCode 工作区；在工作区列表中 → 进入 configurations。",
-    "权限模式会自动记住，配置保存在 ~/.agent-session/opencode.json。",
+    "权限模式会自动记住，配置保存在 ~/.config/opencode/opencode.json 的 permission_mode_selected。",
     "",
     "Options:",
     "  --json                       输出 JSON，方便 jq 或其他脚本处理",

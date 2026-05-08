@@ -5,6 +5,7 @@
 This repository contains small Node.js CLIs for browsing Claude Code, Codex, and OpenCode sessions. Keep the provider CLIs additive: changes for `cx` or `oc` should not regress the existing `cc` behavior.
 
 - `claude/claude-sessions.js`: Claude Code executable and exported helpers for listing, formatting, and launching sessions.
+- `claude/claude-model-providers.js`: Claude Code model provider selection and default model configuration.
 - `codex/codex-sessions.js`: Codex executable with Codex-specific session parsing and launch commands.
 - `opencode/opencode-sessions.js`: OpenCode executable. It reads OpenCode's SQLite database through `sqlite3`.
 - `common/session-utils.js`: shared config, JSONL, command launching, workspace filtering, and interactive picker state helpers.

@@ -142,6 +142,28 @@ test("pickAndRunProvider falls back to numbered prompt outside TTY", async () =>
   ]);
 });
 
+test("pickAndRunProvider falls back to provider permission storage outside TTY", async () => {
+  const commands = [];
+  const provider = fakeProvider({
+    loadPermissionMode: () => "full",
+  });
+
+  await pickAndRunProvider(provider, [{ id: "session-1", messageCount: 1 }], {
+    cwd: "/tmp/project",
+    output: captureOutput().stream,
+    askQuestion: async () => "1",
+    runCommand: (command, args, options) => commands.push({ command, args, options }),
+  });
+
+  assert.deepEqual(commands, [
+    {
+      command: "provider",
+      args: ["1", "full"],
+      options: { cwd: "/tmp/project", env: undefined },
+    },
+  ]);
+});
+
 test("runProviderCli applies trust before pick and pick applies selected workspace trust", async () => {
   const trusted = [];
   const commands = [];

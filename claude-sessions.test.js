@@ -18,6 +18,7 @@ const {
   loadSessionTranscript,
   listWorkspaces,
   markProjectTrusted,
+  pickAndRunClaude,
   renderInteractivePicker,
   renderWorkspacePicker,
   savePermissionMode,
@@ -242,6 +243,48 @@ test("saves permission mode so the next picker run can use it as default", () =>
   assert.equal(updatedConfig.permissionMode, "auto");
   assert.equal(updatedConfig.launchMode, undefined);
   assert.equal(updatedConfig.extra, "keep me");
+});
+
+test("interactive picker uses provider permission storage hooks", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const saved = [];
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+  output.on("data", () => {});
+
+  const picker = createSessionPicker({
+    configPath: path.join(os.tmpdir(), "agent-session-permission-hooks.json"),
+    defaultHome: () => os.tmpdir(),
+    homeOptionName: "claudeHome",
+    listSessions: () => [],
+    listWorkspaces: () => [],
+    filterSessions,
+    renderInteractivePicker,
+    renderWorkspacePicker,
+    workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
+    loadPermissionMode: () => "full",
+    savePermissionMode: (permissionMode) => saved.push(permissionMode),
+  });
+
+  const picked = picker([], {
+    input,
+    output,
+    cwd: "/tmp/payment-api",
+    claudeHome: os.tmpdir(),
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "tab" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  const result = await picked;
+
+  assert.deepEqual(saved, ["default"]);
+  assert.equal(result.permissionMode, "default");
 });
 
 test("rejects invalid picker choices", () => {
@@ -724,6 +767,84 @@ test("workspace right arrow opens configurations and enter applies a configurati
   const result = await picked;
   assert.equal(result.cwd, "/tmp/payment-api");
   assert.equal(result.item.type, "new");
+});
+
+test("Claude configurations show model actions in order with current model names", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-configurations-models-"));
+  const claudeHome = path.join(tempDir, ".claude");
+  const cwd = path.join(tempDir, "payment-api");
+  const projectDir = path.join(claudeHome, "projects", encodeProjectPath(cwd));
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let rendered = "";
+
+  fs.mkdirSync(projectDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(projectDir, "11111111-2222-3333-4444-555555555555.jsonl"),
+    JSON.stringify({
+      type: "user",
+      timestamp: "2026-04-29T00:00:00.000Z",
+      cwd,
+      sessionId: "11111111-2222-3333-4444-555555555555",
+      message: { role: "user", content: "hello" },
+    }),
+  );
+  fs.writeFileSync(
+    path.join(claudeHome, "settings.json"),
+    `${JSON.stringify({
+      model_provider_selected: "custom",
+      env: {
+        ANTHROPIC_DEFAULT_OPUS_MODEL: "glm-5.1",
+        ANTHROPIC_DEFAULT_SONNET_MODEL: "glm-4.6",
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: "glm-4.5-air",
+      },
+      provider: {
+        custom: {
+          ANTHROPIC_BASE_URL: "https://api.example.com",
+          ANTHROPIC_AUTH_TOKEN: "test-token",
+        },
+      },
+    }, null, 2)}\n`,
+  );
+
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+  output.on("data", (chunk) => {
+    rendered += chunk.toString("utf8");
+  });
+
+  const sessions = listSessions({ cwd, claudeHome });
+  const picker = pickAndRunClaude(sessions, {
+    input,
+    output,
+    cwd,
+    claudeHome,
+    configPath: path.join(tempDir, "picker.json"),
+    runCommand: () => {},
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+  rendered = "";
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.match(rendered, /Claude Code configurations/);
+  assert.match(rendered, /> 0\. Model provider\s+custom/);
+  assert.match(rendered, /1\. Opus model\s+glm-5\.1/);
+  assert.match(rendered, /2\. Sonnet model\s+glm-4\.6/);
+  assert.match(rendered, /3\. Haiku model\s+glm-4\.5-air/);
+
+  input.emit("keypress", "", { name: "escape" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  await picker;
 });
 
 test("renders picker status fields in fixed columns", () => {

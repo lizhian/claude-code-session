@@ -7,10 +7,13 @@ const test = require("node:test");
 const {
   fetchRemoteModelNames,
   loadConfiguredModelChoices,
+  loadConfiguredModelValue,
   loadAiSdkProviders,
+  loadOpenCodePermissionMode,
   loadProviderModels,
   parseJsonc,
   saveConfiguredModel,
+  saveOpenCodePermissionMode,
   saveProviderModels,
 } = require("./opencode/opencode-provider-models");
 
@@ -261,6 +264,40 @@ test("loads configured model choices and marks the selected field value", () => 
     { name: "provider-a/gamma", label: "provider-a/gamma", selected: false, columns: [""] },
     { name: "provider-b/beta", label: "provider-b/beta", selected: true, columns: ["selected"] },
   ]);
+});
+
+test("loads configured OpenCode model field values", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-model-values-"));
+  const configPath = path.join(tempDir, "opencode.json");
+  writeConfig(
+    configPath,
+    JSON.stringify({
+      model: "provider-a/alpha",
+      small_model: "provider-b/beta",
+    }),
+  );
+
+  assert.equal(loadConfiguredModelValue("model", configPath), "provider-a/alpha");
+  assert.equal(loadConfiguredModelValue("small_model", configPath), "provider-b/beta");
+});
+
+test("stores OpenCode permission mode in opencode.json", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-permission-mode-"));
+  const configPath = path.join(tempDir, "opencode.json");
+  writeConfig(
+    configPath,
+    JSON.stringify({
+      model: "provider-a/alpha",
+    }),
+  );
+
+  assert.equal(loadOpenCodePermissionMode(configPath), "");
+  saveOpenCodePermissionMode("full", configPath);
+
+  const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  assert.equal(config.permission_mode_selected, "full");
+  assert.equal(config.model, "provider-a/alpha");
+  assert.equal(loadOpenCodePermissionMode(configPath), "full");
 });
 
 test("saves OpenCode default and small model fields", () => {

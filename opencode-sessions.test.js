@@ -462,6 +462,23 @@ test("renders OpenCode provider model counts in aligned columns", () => {
   assert.match(output, /  1\. long-provider  12 models  @ai-sdk\/openai-compatible/);
 });
 
+test("colors selected multi-select configuration items blue", () => {
+  const output = renderConfigurationPicker({
+    title: "OpenCode models",
+    items: [
+      { name: "selected-model", checkable: true, selected: true },
+      { name: "cursor-model", checkable: true, selected: false },
+    ],
+    selectedIndex: 1,
+    rows: 20,
+    columns: 100,
+    color: true,
+  });
+
+  assert.match(output, /\x1b\[34m  0\. \[x\] selected-model\x1b\[0m/);
+  assert.match(output, /\x1b\[36m> 1\. \[ \] cursor-model\s*\x1b\[0m/);
+});
+
 test("parses OpenCode-specific data home option", () => {
   assert.deepEqual(parseArgs(["--opencode-data-home", "/tmp/opencode", "--cwd=/tmp/project"]), {
     cwd: "/tmp/project",

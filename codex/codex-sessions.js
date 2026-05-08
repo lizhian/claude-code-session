@@ -21,7 +21,9 @@ const {
 const { pickAndRunProvider, runProviderCli } = require("../common/provider-runner");
 const { normalizeTranscriptMessages } = require("../common/session-transcript");
 const {
+  loadCodexPermissionMode,
   loadModelProviders,
+  saveCodexPermissionMode,
   selectModelProvider,
 } = require("./codex-model-providers");
 
@@ -272,6 +274,25 @@ function renderConfigurationPicker(options = {}) {
   return renderProviderConfigurationPicker(options);
 }
 
+function currentCodexProviderColumn(dataHome) {
+  try {
+    return [loadModelProviders(dataHome).selectedProviderName || ""];
+  } catch {
+    return [""];
+  }
+}
+
+function loadNativePermissionMode(options = {}, permissionModes) {
+  return normalizePermissionMode(loadCodexPermissionMode(options.codexHome || defaultCodexHome()), permissionModes);
+}
+
+function saveNativePermissionMode(permissionMode, options = {}, permissionModes) {
+  saveCodexPermissionMode(
+    normalizePermissionMode(permissionMode, permissionModes),
+    options.codexHome || options.dataHome || defaultCodexHome(),
+  );
+}
+
 function formatSessions(sessions) {
   return formatProviderSessions(sessions, { providerName: "Codex" });
 }
@@ -352,11 +373,21 @@ const pickSessionInteractive = createSessionPicker({
   renderConfigurationPicker,
   workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
   loadSessionTranscript,
+  loadPermissionMode: (context, permissionModes) => loadNativePermissionMode(
+    { codexHome: context.dataHome },
+    permissionModes,
+  ),
+  savePermissionMode: (permissionMode, context, permissionModes) => saveNativePermissionMode(
+    permissionMode,
+    { codexHome: context.dataHome },
+    permissionModes,
+  ),
   configurationTitle: "Codex configurations",
   configurationActions: [
     {
       name: "Model provider",
       title: "Codex model providers",
+      columns: ({ dataHome }) => currentCodexProviderColumn(dataHome),
       loadItems: ({ dataHome }) => loadModelProviders(dataHome).providers,
       applyItem: (item, { dataHome }) => {
         const result = selectModelProvider(item.name, dataHome);
@@ -377,6 +408,7 @@ const codexProvider = {
   homeOptionName: "codexHome",
   listSessions,
   pickSessionInteractive,
+  loadPermissionMode: loadNativePermissionMode,
   selectedItemToCommand,
   buildCommandFromChoice: buildCodexCommand,
   trustCurrentFolder: (cwd, options) => {
@@ -451,7 +483,7 @@ function usage() {
     "",
     "获取指定目录对应的 Codex sessions。默认读取当前目录和 ~/.codex。",
     "交互模式快捷键：Tab 切换 default/auto/full permission，→ 选择 Codex 工作区；在工作区列表中 → 进入 configurations，Enter 进入选中工作区的 sessions。",
-    "权限模式会自动记住，配置保存在 ~/.agent-session/codex.json。",
+    "权限模式会自动记住，配置保存在 ~/.codex/config.toml 的 permission_mode_selected。",
     "",
     "Options:",
     "  --json                 输出 JSON，方便 jq 或其他脚本处理",
