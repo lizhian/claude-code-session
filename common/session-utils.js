@@ -308,6 +308,7 @@ function createSessionPicker({
               selectedIndex: workspaceSelectedIndex,
               rows: output.rows || 24,
               columns: output.columns || 100,
+              color: io.color ?? true,
             }),
           );
           return;
@@ -347,6 +348,7 @@ function createSessionPicker({
             cwd: currentCwd,
             rows: output.rows || 24,
             columns: output.columns || 100,
+            color: io.color ?? true,
           }),
         );
       }

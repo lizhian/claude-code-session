@@ -6,7 +6,11 @@ const {
 
 const ANSI = {
   reset: "\x1b[0m",
+  permissionDefault: "\x1b[32m",
+  permissionAuto: "\x1b[34m",
+  permissionFull: "\x1b[31m",
   previewMeta: "\x1b[36m",
+  selectedSession: "\x1b[36m",
 };
 
 function colorize(value, color, enabled) {
@@ -71,7 +75,7 @@ function displayWidth(value) {
 }
 
 function truncateToWidth(value, maxWidth) {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
+  const text = stripAnsi(value).replace(/\s+/g, " ").trim();
   if (displayWidth(text) <= maxWidth) {
     return text;
   }
@@ -378,8 +382,19 @@ function permissionModeLabel(permissionMode, permissionModes) {
   return normalizePermissionMode(permissionMode, permissionModes);
 }
 
-function pickerStatusLine(permissionMode, filteredCount, query, permissionModes) {
-  const permission = padDisplay(`Permission: ${permissionModeLabel(permissionMode, permissionModes)}`, 24);
+function permissionModeColor(permissionMode) {
+  if (permissionMode === "auto") {
+    return ANSI.permissionAuto;
+  }
+  if (permissionMode === "full") {
+    return ANSI.permissionFull;
+  }
+  return ANSI.permissionDefault;
+}
+
+function pickerStatusLine(permissionMode, filteredCount, query, permissionModes, options = {}) {
+  const mode = permissionModeLabel(permissionMode, permissionModes);
+  const permission = padDisplay(`Permission: ${colorize(mode, permissionModeColor(mode), options.color)}`, 24);
   const matches = padDisplay(`Matches: ${filteredCount}`, 18);
   return `${permission}${matches}Search: ${query}`;
 }
@@ -402,7 +417,7 @@ function renderSessionPreview(options) {
   const header = [
     fitLine(`${title}  ${session.id}`, columns),
     fitLine(`Workspace: ${cwd}`, columns),
-    fitLine(pickerStatusLine(permissionMode, options.filteredCount || 0, options.query || "", options.permissionModes), columns),
+    fitLine(pickerStatusLine(permissionMode, options.filteredCount || 0, options.query || "", options.permissionModes, { color: useColor }), columns),
     "",
   ];
   const body = [
@@ -471,6 +486,7 @@ function renderInteractivePicker(options) {
   const now = options.now || new Date();
   const rows = options.rows || process.stdout.rows || 24;
   const columns = options.columns || process.stdout.columns || 100;
+  const useColor = options.color === true;
   const title = options.title || "Claude Code sessions";
   const items = pickerItems(sessions, query);
   const selectedIndex = clampSelectedIndex(options.selectedIndex || 0, items.length);
@@ -500,7 +516,7 @@ function renderInteractivePicker(options) {
   const lines = [
     fitLine(pickerTitleLine(title, selectedItem), columns),
     fitLine(`Workspace: ${cwd}`, columns),
-    fitLine(pickerStatusLine(permissionMode, filteredCount, query, options.permissionModes), columns),
+    fitLine(pickerStatusLine(permissionMode, filteredCount, query, options.permissionModes, { color: useColor }), columns),
     "",
   ];
 
@@ -527,7 +543,8 @@ function renderInteractivePicker(options) {
       updated,
       timeWidth,
     )}  ${padDisplay(messages, messagesWidth, "right")}  ${promptPart}`;
-    lines.push(fitLine(line, columns));
+    const fittedLine = fitLine(line, columns);
+    lines.push(itemIndex === selectedIndex ? colorize(fittedLine, ANSI.selectedSession, useColor) : fittedLine);
   });
 
   if (filteredCount === 0 && query.trim()) {
@@ -544,6 +561,7 @@ function renderWorkspacePicker(options) {
   const now = options.now || new Date();
   const rows = options.rows || process.stdout.rows || 24;
   const columns = options.columns || process.stdout.columns || 100;
+  const useColor = options.color === true;
   const title = options.title || "Claude Code workspaces";
   const items = workspaceItems(workspaces, query);
   const selectedIndex = clampSelectedIndex(options.selectedIndex || 0, items.length);
@@ -560,7 +578,11 @@ function renderWorkspacePicker(options) {
     "SESSIONS".length,
     ...visibleItems.map((item) => displayWidth(`${item.workspace.sessionCount} sessions`)),
   );
-  const fixedWorkspaceWidth = 2 + numberWidth + 2 + timeWidth + 2 + sessionsWidth + 2;
+  const messagesWidth = Math.max(
+    "MESSAGES".length,
+    ...visibleItems.map((item) => displayWidth(`${item.workspace.messageCount || 0} msg`)),
+  );
+  const fixedWorkspaceWidth = 2 + numberWidth + 2 + timeWidth + 2 + sessionsWidth + 2 + messagesWidth + 2;
   const pathWidth = Math.max(1, columns - fixedWorkspaceWidth);
   const lines = [
     fitLine(title, columns),
@@ -576,12 +598,14 @@ function renderWorkspacePicker(options) {
     const workspace = item.workspace;
     const updated = formatSessionTime(workspace.updatedAt, now);
     const sessions = `${workspace.sessionCount} sessions`;
+    const messages = `${workspace.messageCount || 0} msg`;
     const workspacePath = truncateToWidth(workspace.cwd || workspace.projectDir || "-", pathWidth);
     const line = `${prefix}${padDisplay(`${number}.`, numberWidth, "right")} ${padDisplay(
       updated,
       timeWidth,
-    )}  ${padDisplay(sessions, sessionsWidth, "right")}  ${workspacePath}`;
-    lines.push(fitLine(line, columns));
+    )}  ${padDisplay(sessions, sessionsWidth, "right")}  ${padDisplay(messages, messagesWidth, "right")}  ${workspacePath}`;
+    const fittedLine = fitLine(line, columns);
+    lines.push(itemIndex === selectedIndex ? colorize(fittedLine, ANSI.selectedSession, useColor) : fittedLine);
   });
 
   if (filteredCount === 0 && query.trim()) {

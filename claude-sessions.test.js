@@ -657,6 +657,36 @@ test("renders picker status fields in fixed columns", () => {
   assert.equal(fullLine.indexOf("Search:"), defaultLine.indexOf("Search:"));
 });
 
+test("colors permission modes and selected sessions in the interactive picker", () => {
+  const baseOptions = {
+    sessions: [
+      {
+        id: "11111111-2222-3333-4444-555555555555",
+        messageCount: 2,
+        updatedAt: "2026-04-29T11:00:00.000Z",
+        firstUserMessage: "first prompt",
+        lastUserMessage: "last prompt",
+      },
+    ],
+    selectedIndex: 1,
+    cwd: "/tmp/payment-api",
+    now: new Date("2026-04-29T12:00:00.000Z"),
+    rows: 20,
+    columns: 100,
+    color: true,
+  };
+
+  const defaultOutput = renderInteractivePicker({ ...baseOptions, permissionMode: "default" });
+  const autoOutput = renderInteractivePicker({ ...baseOptions, permissionMode: "auto" });
+  const fullOutput = renderInteractivePicker({ ...baseOptions, permissionMode: "full" });
+
+  assert.match(defaultOutput, /Permission: \x1b\[32mdefault\x1b\[0m/);
+  assert.match(autoOutput, /Permission: \x1b\[34mauto\x1b\[0m/);
+  assert.match(fullOutput, /Permission: \x1b\[31mfull\x1b\[0m/);
+  assert.match(defaultOutput, /\x1b\[36m> 1\. 1小时前\s+2 msg\s+first prompt\s+last prompt\x1b\[0m/);
+  assert.ok(defaultOutput.split("\n").every((line) => displayWidth(line) <= 100));
+});
+
 test("calculates terminal display width and truncates without overflowing", () => {
   assert.equal(displayWidth("abc"), 3);
   assert.equal(displayWidth("中文"), 4);
@@ -762,6 +792,7 @@ test("lists Claude Code workspaces from project session files", () => {
   assert.equal(workspaces.length, 2);
   assert.equal(workspaces[0].cwd, secondCwd);
   assert.equal(workspaces[0].sessionCount, 1);
+  assert.equal(workspaces[0].messageCount, 1);
   assert.equal(workspaces[0].updatedAt, "2026-04-29T00:01:00.000Z");
   assert.equal(workspaces[0].lastUserMessage, "second workspace prompt");
   assert.equal(workspaces[1].cwd, firstCwd);
@@ -773,12 +804,14 @@ test("renders searchable workspace picker", () => {
       {
         cwd: "/tmp/first-workspace",
         sessionCount: 2,
+        messageCount: 20,
         updatedAt: "2026-04-29T11:59:00.000Z",
         lastUserMessage: "first prompt",
       },
       {
         cwd: "/tmp/second-workspace-with-a-very-long-path-name",
         sessionCount: 1000,
+        messageCount: 12345,
         updatedAt: "2026-04-25T12:00:00.000Z",
         lastUserMessage: "second prompt",
       },
@@ -797,9 +830,37 @@ test("renders searchable workspace picker", () => {
   assert.doesNotMatch(output, /Enter choose/);
   assert.doesNotMatch(output, /← sessions/);
   assert.doesNotMatch(output, /Esc cancel/);
-  assert.match(output, /> 0\. 4天前\s+1000 sessions/);
-  assert.match(output, /second-workspace/);
+  assert.match(output, /> 0\. 4天前\s+1000 sessions\s+12345 msg/);
+  assert.match(output, /second-workspac/);
   assert.ok(output.split("\n").every((line) => displayWidth(line) <= 64));
+});
+
+test("colors the selected workspace row in the workspace picker", () => {
+  const output = renderWorkspacePicker({
+    workspaces: [
+      {
+        cwd: "/tmp/first-workspace",
+        sessionCount: 2,
+        messageCount: 20,
+        updatedAt: "2026-04-29T11:00:00.000Z",
+      },
+      {
+        cwd: "/tmp/second-workspace",
+        sessionCount: 1,
+        messageCount: 10,
+        updatedAt: "2026-04-29T11:30:00.000Z",
+      },
+    ],
+    selectedIndex: 1,
+    now: new Date("2026-04-29T12:00:00.000Z"),
+    rows: 20,
+    columns: 100,
+    color: true,
+  });
+
+  assert.match(output, /\x1b\[36m> 1\. 30分钟前\s+1 sessions\s+10 msg\s+\/tmp\/second-workspace\x1b\[0m/);
+  assert.doesNotMatch(output, /\x1b\[36m  0\. 1小时前/);
+  assert.ok(output.split("\n").every((line) => displayWidth(line) <= 100));
 });
 
 test("marks the current folder trusted in Claude config", () => {
