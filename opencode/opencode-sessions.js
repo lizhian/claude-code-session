@@ -13,13 +13,11 @@ const {
   renderWorkspacePicker: renderProviderWorkspacePicker,
 } = require("../common/session-renderer");
 const {
-  askQuestion,
   createSessionPicker,
-  loadPermissionMode,
   normalizePermissionMode,
   resolveSessionChoice,
-  runCommand,
 } = require("../common/session-utils");
+const { pickAndRunProvider, runProviderCli } = require("../common/provider-runner");
 const { normalizeTranscriptMessages } = require("../common/session-transcript");
 
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-session", "opencode.json");
@@ -279,33 +277,32 @@ const pickSessionInteractive = createSessionPicker({
   loadSessionTranscript,
 });
 
+const openCodeProvider = {
+  configPath: DEFAULT_CONFIG_PATH,
+  defaultHome: defaultOpenCodeDataHome,
+  homeOptionName: "opencodeDataHome",
+  permissionModes: OPENCODE_PERMISSION_MODES,
+  listSessions,
+  pickSessionInteractive,
+  selectedItemToCommand,
+  buildCommandFromChoice: buildOpenCodeCommand,
+  formatPicker,
+  formatSessions,
+  jsonPayload: ({ cwd, opencodeDataHome, sessions }) => ({
+    cwd,
+    opencodeDataHome,
+    count: sessions.length,
+    sessions,
+  }),
+  summaryLines: ({ cwd, opencodeDataHome, sessions }) => [
+    `CWD: ${cwd}`,
+    `OpenCode data home: ${opencodeDataHome}`,
+    `Sessions: ${sessions.length}`,
+  ],
+};
+
 async function pickAndRunOpenCode(sessions, options = {}) {
-  const configPath = options.configPath || DEFAULT_CONFIG_PATH;
-  const permissionMode = normalizePermissionMode(
-    options.permissionMode || options.launchMode || loadPermissionMode(configPath, OPENCODE_PERMISSION_MODES),
-    OPENCODE_PERMISSION_MODES,
-  );
-  const picked = await pickSessionInteractive(sessions, options);
-  if (picked) {
-    const { command, args, cwd, env } = selectedItemToCommand(picked.item, {
-      permissionMode: picked.permissionMode,
-      cwd: picked.cwd,
-    });
-    runCommand(command, args, { cwd, env });
-    return;
-  }
-
-  if (process.stdin.isTTY && process.stdout.isTTY) {
-    process.exitCode = 130;
-    return;
-  }
-
-  console.log(formatPicker(sessions));
-  console.log("");
-
-  const answer = await askQuestion("选择 session 编号，直接回车创建 New session: ");
-  const { command, args, env } = buildOpenCodeCommand(sessions, answer, { ...options, permissionMode });
-  runCommand(command, args, { cwd: options.cwd, env });
+  return pickAndRunProvider(openCodeProvider, sessions, options);
 }
 
 function parseArgs(argv) {
@@ -378,40 +375,7 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  const cwd = path.resolve(options.cwd);
-  const opencodeDataHome = path.resolve(options.opencodeDataHome);
-  const sessions = listSessions({ cwd, opencodeDataHome });
-
-  if (options.pick) {
-    await pickAndRunOpenCode(sessions, {
-      cwd,
-      opencodeDataHome,
-      trustCurrentFolder: options.trustCurrentFolder,
-    });
-    return;
-  }
-
-  if (options.json) {
-    console.log(
-      JSON.stringify(
-        {
-          cwd,
-          opencodeDataHome,
-          count: sessions.length,
-          sessions,
-        },
-        null,
-        2,
-      ),
-    );
-    return;
-  }
-
-  console.log(`CWD: ${cwd}`);
-  console.log(`OpenCode data home: ${opencodeDataHome}`);
-  console.log(`Sessions: ${sessions.length}`);
-  console.log("");
-  console.log(formatSessions(sessions));
+  await runProviderCli(openCodeProvider, options);
 }
 
 if (require.main === module) {

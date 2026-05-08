@@ -12,14 +12,12 @@ const {
   renderWorkspacePicker: renderProviderWorkspacePicker,
 } = require("../common/session-renderer");
 const {
-  askQuestion,
   createSessionPicker,
-  loadPermissionMode,
   normalizePermissionMode,
   readJsonLines,
   resolveSessionChoice,
-  runCommand,
 } = require("../common/session-utils");
+const { pickAndRunProvider, runProviderCli } = require("../common/provider-runner");
 const { normalizeTranscriptMessages } = require("../common/session-transcript");
 
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-session", "codex.json");
@@ -330,38 +328,34 @@ const pickSessionInteractive = createSessionPicker({
   loadSessionTranscript,
 });
 
+const codexProvider = {
+  configPath: DEFAULT_CONFIG_PATH,
+  defaultHome: defaultCodexHome,
+  homeOptionName: "codexHome",
+  listSessions,
+  pickSessionInteractive,
+  selectedItemToCommand,
+  buildCommandFromChoice: buildCodexCommand,
+  trustCurrentFolder: (cwd, options) => {
+    markProjectTrusted(cwd, path.join(options.codexHome || defaultCodexHome(), "config.toml"));
+  },
+  formatPicker,
+  formatSessions,
+  jsonPayload: ({ cwd, codexHome, sessions }) => ({
+    cwd,
+    codexHome,
+    count: sessions.length,
+    sessions,
+  }),
+  summaryLines: ({ cwd, codexHome, sessions }) => [
+    `CWD: ${cwd}`,
+    `Codex home: ${codexHome}`,
+    `Sessions: ${sessions.length}`,
+  ],
+};
+
 async function pickAndRunCodex(sessions, options = {}) {
-  const configPath = options.configPath || DEFAULT_CONFIG_PATH;
-  const permissionMode = normalizePermissionMode(
-    options.permissionMode || options.launchMode || loadPermissionMode(configPath),
-  );
-  const picked = await pickSessionInteractive(sessions, options);
-  if (picked) {
-    if (options.trustCurrentFolder) {
-      markProjectTrusted(picked.cwd, path.join(options.codexHome || defaultCodexHome(), "config.toml"));
-    }
-    const { command, args, cwd } = selectedItemToCommand(picked.item, {
-      permissionMode: picked.permissionMode,
-      cwd: picked.cwd,
-    });
-    runCommand(command, args, { cwd });
-    return;
-  }
-
-  if (process.stdin.isTTY && process.stdout.isTTY) {
-    process.exitCode = 130;
-    return;
-  }
-
-  console.log(formatPicker(sessions));
-  console.log("");
-
-  const answer = await askQuestion("选择 session 编号，直接回车创建 New session: ");
-  if (options.trustCurrentFolder) {
-    markProjectTrusted(options.cwd, path.join(options.codexHome || defaultCodexHome(), "config.toml"));
-  }
-  const { command, args } = buildCodexCommand(sessions, answer, { ...options, permissionMode });
-  runCommand(command, args, { cwd: options.cwd });
+  return pickAndRunProvider(codexProvider, sessions, options);
 }
 
 function parseArgs(argv) {
@@ -434,40 +428,7 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  const cwd = path.resolve(options.cwd);
-  const codexHome = path.resolve(options.codexHome);
-  const sessions = listSessions({ cwd, codexHome });
-
-  if (options.trustCurrentFolder) {
-    markProjectTrusted(cwd, path.join(codexHome, "config.toml"));
-  }
-
-  if (options.pick) {
-    await pickAndRunCodex(sessions, { cwd, codexHome, trustCurrentFolder: options.trustCurrentFolder });
-    return;
-  }
-
-  if (options.json) {
-    console.log(
-      JSON.stringify(
-        {
-          cwd,
-          codexHome,
-          count: sessions.length,
-          sessions,
-        },
-        null,
-        2,
-      ),
-    );
-    return;
-  }
-
-  console.log(`CWD: ${cwd}`);
-  console.log(`Codex home: ${codexHome}`);
-  console.log(`Sessions: ${sessions.length}`);
-  console.log("");
-  console.log(formatSessions(sessions));
+  await runProviderCli(codexProvider, options);
 }
 
 if (require.main === module) {

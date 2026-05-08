@@ -4,16 +4,15 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const {
-  askQuestion,
   createSessionPicker,
   filterWorkspaces,
   loadPermissionMode: loadPermissionModeFromConfig,
   normalizePermissionMode,
   readJsonLines,
   resolveSessionChoice,
-  runCommand,
   savePermissionMode: savePermissionModeToConfig,
 } = require("../common/session-utils");
+const { pickAndRunProvider, runProviderCli } = require("../common/provider-runner");
 const { normalizeTranscriptMessages } = require("../common/session-transcript");
 const {
   displayWidth,
@@ -304,38 +303,33 @@ const pickSessionInteractive = createSessionPicker({
   loadSessionTranscript,
 });
 
+const claudeProvider = {
+  configPath: DEFAULT_CONFIG_PATH,
+  defaultHome: defaultClaudeHome,
+  homeOptionName: "claudeHome",
+  listSessions,
+  pickSessionInteractive,
+  selectedItemToCommand,
+  buildCommandFromChoice: buildClaudeCommand,
+  trustCurrentFolder: (cwd) => markProjectTrusted(cwd),
+  formatPicker,
+  formatSessions,
+  jsonPayload: ({ cwd, claudeHome, sessions }) => ({
+    cwd,
+    claudeHome,
+    projectDir: path.join(claudeHome, "projects", encodeProjectPath(cwd)),
+    count: sessions.length,
+    sessions,
+  }),
+  summaryLines: ({ cwd, claudeHome, sessions }) => [
+    `CWD: ${cwd}`,
+    `Claude project dir: ${path.join(claudeHome, "projects", encodeProjectPath(cwd))}`,
+    `Sessions: ${sessions.length}`,
+  ],
+};
+
 async function pickAndRunClaude(sessions, options = {}) {
-  const configPath = options.configPath || DEFAULT_CONFIG_PATH;
-  const permissionMode = normalizePermissionMode(
-    options.permissionMode || options.launchMode || loadPermissionMode(configPath),
-  );
-  const picked = await pickSessionInteractive(sessions, options);
-  if (picked) {
-    if (options.trustCurrentFolder) {
-      markProjectTrusted(picked.cwd);
-    }
-    const { command, args, cwd } = selectedItemToCommand(picked.item, {
-      permissionMode: picked.permissionMode,
-      cwd: picked.cwd,
-    });
-    runCommand(command, args, { cwd });
-    return;
-  }
-
-  if (process.stdin.isTTY && process.stdout.isTTY) {
-    process.exitCode = 130;
-    return;
-  }
-
-  console.log(formatPicker(sessions));
-  console.log("");
-
-  const answer = await askQuestion("选择 session 编号，直接回车创建 New session: ");
-  if (options.trustCurrentFolder) {
-    markProjectTrusted(options.cwd);
-  }
-  const { command, args } = buildClaudeCommand(sessions, answer, { ...options, permissionMode });
-  runCommand(command, args, { cwd: options.cwd });
+  return pickAndRunProvider(claudeProvider, sessions, options);
 }
 
 function parseArgs(argv) {
@@ -408,42 +402,7 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  const cwd = path.resolve(options.cwd);
-  const claudeHome = path.resolve(options.claudeHome);
-  const projectDir = path.join(claudeHome, "projects", encodeProjectPath(cwd));
-  const sessions = listSessions({ cwd, claudeHome });
-
-  if (options.trustCurrentFolder) {
-    markProjectTrusted(cwd);
-  }
-
-  if (options.pick) {
-    await pickAndRunClaude(sessions, { cwd, claudeHome, trustCurrentFolder: options.trustCurrentFolder });
-    return;
-  }
-
-  if (options.json) {
-    console.log(
-      JSON.stringify(
-        {
-          cwd,
-          claudeHome,
-          projectDir,
-          count: sessions.length,
-          sessions,
-        },
-        null,
-        2,
-      ),
-    );
-    return;
-  }
-
-  console.log(`CWD: ${cwd}`);
-  console.log(`Claude project dir: ${projectDir}`);
-  console.log(`Sessions: ${sessions.length}`);
-  console.log("");
-  console.log(formatSessions(sessions));
+  await runProviderCli(claudeProvider, options);
 }
 
 if (require.main === module) {

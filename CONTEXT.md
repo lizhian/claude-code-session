@@ -16,6 +16,10 @@ _Avoid_: Agent file, provider script
 The user-facing command or alias that launches a **Provider CLI**.
 _Avoid_: Internal file path
 
+**Public command runner**:
+A **Common support module** that executes the shared lifecycle of a **Public command** after provider-specific argument parsing.
+_Avoid_: Provider main, CLI runner
+
 **Common support module**:
 A shared module used by multiple **Provider CLIs** for picker state, config, formatting, JSONL parsing, or command launching.
 _Avoid_: Provider code
@@ -44,6 +48,7 @@ _Avoid_: Flattened install files
 
 - A **Provider CLI** belongs to exactly one **Agent provider**.
 - A **Public command** points at exactly one **Provider CLI**.
+- A **Provider CLI** may delegate **Public command** lifecycle behavior to a **Public command runner**.
 - A **Common support module** may be used by multiple **Provider CLIs**.
 - **Provider CLIs** keep provider-specific behavior separate from **Common support modules**.
 - A **Session renderer** may be used by any **Provider CLI**.
@@ -57,6 +62,9 @@ _Avoid_: Flattened install files
 
 > **Dev:** "If we move `claude-sessions.js` under `claude/`, should the `cc` alias change?"
 > **Domain expert:** "No. `cc` is a **Public command**. The file move only changes the internal **Provider CLI** path."
+
+> **Dev:** "Should the Claude **Provider CLI** own JSON output and fallback prompt flow?"
+> **Domain expert:** "No. Those are shared **Public command** lifecycle behaviours and belong in the **Public command runner**."
 
 > **Dev:** "Can Codex reuse the Claude picker renderer?"
 > **Domain expert:** "It can reuse the same **Session renderer**, but that renderer must live under `common/`, not inside the Claude **Provider CLI**."
@@ -73,6 +81,7 @@ _Avoid_: Flattened install files
 ## Flagged ambiguities
 
 - "agent file" is resolved as **Provider CLI** when it refers to the Claude, Codex, or OpenCode executable module.
+- "CLI runner" is resolved as **Public command runner** when it refers to shared command lifecycle behavior.
 - "Claude renderer" is resolved as **Session renderer** once the formatting logic is shared by Codex and OpenCode.
 - "root files" is resolved as the legacy layout where Provider CLIs lived at the repository root; the resolved **Source layout** no longer keeps root Provider CLI files.
 - "preview messages" is resolved as **Session preview** backed by a lazily-loaded **Session transcript**, not the already-loaded session summary.
