@@ -7,6 +7,7 @@ const test = require("node:test");
 const {
   DEFAULT_CONFIG_PATH,
   buildCodexCommand,
+  dedupeTranscriptMessages,
   loadSessionTranscript,
   listSessions,
   listWorkspaces,
@@ -110,6 +111,22 @@ test("loads full Codex transcript text from a session file", () => {
     { role: "user", timestamp: "2026-04-29T14:56:25.542Z", text: "first prompt", ordinal: 1 },
     { role: "user", timestamp: "2026-04-29T15:00:00.000Z", text: "last prompt", ordinal: 2 },
   ]);
+});
+
+test("deduplicates Codex transcript user records written as response_item and event_msg", () => {
+  assert.deepEqual(
+    dedupeTranscriptMessages([
+      { role: "user", timestamp: "2026-05-08T03:49:45.468Z", text: "same prompt\n" },
+      { role: "user", timestamp: "2026-05-08T03:49:45.468Z", text: "same prompt" },
+      { role: "assistant", timestamp: "2026-05-08T03:49:46.000Z", text: "reply" },
+      { role: "user", timestamp: "2026-05-08T03:50:00.000Z", text: "next prompt" },
+    ]),
+    [
+      { role: "user", timestamp: "2026-05-08T03:49:45.468Z", text: "same prompt\n" },
+      { role: "assistant", timestamp: "2026-05-08T03:49:46.000Z", text: "reply" },
+      { role: "user", timestamp: "2026-05-08T03:50:00.000Z", text: "next prompt" },
+    ],
+  );
 });
 
 test("lists Codex workspaces grouped by cwd", () => {

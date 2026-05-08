@@ -189,7 +189,23 @@ function loadSessionTranscript(session) {
   }
 
   const { records } = readJsonLines(session.file);
-  return normalizeTranscriptMessages(records.map(transcriptMessageFromRecord).filter(Boolean));
+  return normalizeTranscriptMessages(dedupeTranscriptMessages(records.map(transcriptMessageFromRecord).filter(Boolean)));
+}
+
+function dedupeTranscriptMessages(messages) {
+  const seen = new Set();
+  return messages.filter((message) => {
+    if (!message || String(message.role || "").toLowerCase() !== "user") {
+      return true;
+    }
+
+    const key = `${message.timestamp || ""}\0${String(message.text || "").trim()}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function defaultCodexHome() {
@@ -482,6 +498,7 @@ module.exports = {
   markProjectTrusted,
   parseArgs,
   pickAndRunCodex,
+  dedupeTranscriptMessages,
   renderInteractivePicker,
   renderConfigurationPicker,
   renderWorkspacePicker,

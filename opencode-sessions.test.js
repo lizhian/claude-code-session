@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { PassThrough } = require("node:stream");
 const test = require("node:test");
 
 const {
@@ -16,7 +17,8 @@ const {
   renderWorkspacePicker,
   selectedItemToCommand,
 } = require("./opencode/opencode-sessions");
-const { nextPermissionMode } = require("./common/session-utils");
+const { createSessionPicker, nextPermissionMode } = require("./common/session-utils");
+const { filterSessions, renderConfigurationPicker } = require("./common/session-renderer");
 
 function sqlite(dbPath, sql) {
   const result = spawnSync("sqlite3", [dbPath, sql], { encoding: "utf8" });
@@ -277,6 +279,187 @@ test("renders OpenCode workspace picker title", () => {
   });
 
   assert.match(output, /OpenCode workspaces/);
+});
+
+test("configuration subitems support space multi-select and enter save", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let rendered = "";
+  const saved = [];
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+  output.on("data", (chunk) => {
+    rendered += chunk.toString("utf8");
+  });
+
+  const picker = createSessionPicker({
+    configPath: path.join(os.tmpdir(), "agent-session-opencode-models-test.json"),
+    defaultHome: () => os.tmpdir(),
+    homeOptionName: "opencodeDataHome",
+    listSessions: () => [],
+    listWorkspaces: () => [{ cwd: "/tmp/demo", sessionCount: 1, messageCount: 1 }],
+    filterSessions,
+    renderInteractivePicker,
+    renderWorkspacePicker,
+    renderConfigurationPicker,
+    workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
+    configurationTitle: "OpenCode configurations",
+    configurationActions: [
+      {
+        name: "Provider models",
+        title: "OpenCode providers",
+        mode: "multiselect",
+        loadItems: () => [{ name: "demo-provider" }],
+        loadSubitems: () => [
+          { name: "configured-only", selected: true, description: "configured" },
+          { name: "new-model", selected: false },
+        ],
+        subitemsTitle: (item) => `OpenCode models: ${item.name}`,
+        applySubitems: (item, selectedItems) => {
+          saved.push({ provider: item.name, models: selectedItems.map((model) => model.name) });
+          return { status: `Updated models for ${item.name}: ${selectedItems.length} selected` };
+        },
+      },
+    ],
+    permissionModes: ["default", "full"],
+  });
+  const picked = picker([], {
+    input,
+    output,
+    cwd: "/tmp/demo",
+    opencodeDataHome: os.tmpdir(),
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.match(rendered, /OpenCode models: demo-provider/);
+  assert.match(rendered, /\[x\] configured-only/);
+  assert.match(rendered, /\[ \] new-model/);
+
+  rendered = "";
+  input.emit("keypress", "", { name: "down" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", " ", { name: "space" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(rendered, /\[x\] new-model/);
+
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(saved, [{ provider: "demo-provider", models: ["configured-only", "new-model"] }]);
+  assert.match(rendered, /Updated models for demo-provider: 2 selected/);
+
+  input.emit("keypress", "", { name: "escape" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "escape" });
+  const result = await picked;
+  assert.equal(result, null);
+});
+
+test("configuration item can update a selected default model", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let rendered = "";
+  const saved = [];
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+  output.on("data", (chunk) => {
+    rendered += chunk.toString("utf8");
+  });
+
+  const picker = createSessionPicker({
+    configPath: path.join(os.tmpdir(), "agent-session-opencode-default-model-test.json"),
+    defaultHome: () => os.tmpdir(),
+    homeOptionName: "opencodeDataHome",
+    listSessions: () => [],
+    listWorkspaces: () => [{ cwd: "/tmp/demo", sessionCount: 1, messageCount: 1 }],
+    filterSessions,
+    renderInteractivePicker,
+    renderWorkspacePicker,
+    renderConfigurationPicker,
+    workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
+    configurationTitle: "OpenCode configurations",
+    configurationActions: [
+      {
+        name: "Provider models",
+        title: "OpenCode providers",
+        loadItems: () => [],
+        applyItem: () => {},
+      },
+      {
+        name: "Default model",
+        title: "OpenCode default model",
+        loadItems: () => [
+          { name: "provider-a/alpha", selected: true, columns: ["selected"] },
+          { name: "provider-a/beta", selected: false, columns: [""] },
+        ],
+        applyItem: (item) => {
+          saved.push(item.name);
+          return { status: `Updated default model: ${item.name}` };
+        },
+      },
+    ],
+    permissionModes: ["default", "full"],
+  });
+  const picked = picker([], {
+    input,
+    output,
+    cwd: "/tmp/demo",
+    opencodeDataHome: os.tmpdir(),
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "right" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "down" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(rendered, /OpenCode default model/);
+  assert.match(rendered, /provider-a\/alpha  selected/);
+
+  input.emit("keypress", "", { name: "down" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "return" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(saved, ["provider-a/beta"]);
+  assert.match(rendered, /Updated default model: provider-a\/beta/);
+
+  input.emit("keypress", "", { name: "escape" });
+  await new Promise((resolve) => setImmediate(resolve));
+  input.emit("keypress", "", { name: "escape" });
+  const result = await picked;
+  assert.equal(result, null);
+});
+
+test("renders OpenCode provider model counts in aligned columns", () => {
+  const output = renderConfigurationPicker({
+    title: "OpenCode providers",
+    items: [
+      { name: "a", columns: ["2 models", "@ai-sdk/openai"] },
+      { name: "long-provider", columns: ["12 models", "@ai-sdk/openai-compatible"] },
+    ],
+    rows: 20,
+    columns: 100,
+  });
+
+  assert.match(output, /> 0\. a              2 models   @ai-sdk\/openai/);
+  assert.match(output, /  1\. long-provider  12 models  @ai-sdk\/openai-compatible/);
 });
 
 test("parses OpenCode-specific data home option", () => {

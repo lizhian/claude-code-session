@@ -240,7 +240,9 @@ function createSessionPicker({
     let configurationSelectedIndex = 0;
     let configurationItemSelectedIndex = 0;
     let activeConfigurationAction = null;
+    let activeConfigurationItem = null;
     let configurationItems = [];
+    let configurationSubitems = [];
     let configurationStatus = "";
     let previousQueryHadText = false;
     let previewTranscript = null;
@@ -283,12 +285,12 @@ function createSessionPicker({
         previewError = "";
       }
 
-      function loadConfigurationItems(action) {
+      async function loadConfigurationItems(action) {
         if (!action || typeof action.loadItems !== "function") {
           return [];
         }
 
-        return action.loadItems({
+        return await action.loadItems({
           cwd: currentCwd,
           dataHome,
           homeOptionName,
@@ -375,6 +377,27 @@ function createSessionPicker({
           return;
         }
 
+        if (view === "configurationSubitems") {
+          configurationItemSelectedIndex = clampSelectedIndex(configurationItemSelectedIndex, configurationSubitems.length);
+          output.write(
+            renderConfigurationPicker({
+              title: activeConfigurationAction && typeof activeConfigurationAction.subitemsTitle === "function"
+                ? activeConfigurationAction.subitemsTitle(activeConfigurationItem)
+                : "Configurations",
+              items: configurationSubitems,
+              selectedIndex: configurationItemSelectedIndex,
+              status: configurationStatus,
+              emptyMessage: activeConfigurationAction && activeConfigurationAction.emptySubitemsMessage
+                ? activeConfigurationAction.emptySubitemsMessage
+                : "No configurations.",
+              rows: output.rows || 24,
+              columns: output.columns || 100,
+              color: io.color ?? true,
+            }),
+          );
+          return;
+        }
+
         const itemCount = currentSessionItems().length;
         sessionSelectedIndex = clampSelectedIndex(sessionSelectedIndex, itemCount);
         if (view === "preview") {
@@ -414,7 +437,7 @@ function createSessionPicker({
         );
       }
 
-      function onKeypress(str, key = {}) {
+      async function onKeypress(str, key = {}) {
         if (key.ctrl && key.name === "c") {
           cleanup();
           resolve(null);
@@ -431,7 +454,16 @@ function createSessionPicker({
           if (view === "configurationItems") {
             view = "configurations";
             activeConfigurationAction = null;
+            activeConfigurationItem = null;
             configurationItems = [];
+            configurationSubitems = [];
+            render();
+            return;
+          }
+          if (view === "configurationSubitems") {
+            view = "configurationItems";
+            activeConfigurationItem = null;
+            configurationSubitems = [];
             render();
             return;
           }
@@ -454,7 +486,7 @@ function createSessionPicker({
             activeConfigurationAction = action;
             configurationItemSelectedIndex = 0;
             try {
-              configurationItems = loadConfigurationItems(action);
+              configurationItems = await loadConfigurationItems(action);
               configurationStatus = "";
               view = "configurationItems";
             } catch (error) {
@@ -467,11 +499,29 @@ function createSessionPicker({
 
           if (view === "configurationItems") {
             const item = configurationItems[clampSelectedIndex(configurationItemSelectedIndex, configurationItems.length)];
-            if (!item || !activeConfigurationAction || typeof activeConfigurationAction.applyItem !== "function") {
+            if (!item || !activeConfigurationAction) {
               return;
             }
             try {
-              const result = activeConfigurationAction.applyItem(item, {
+              if (activeConfigurationAction.mode === "multiselect" && typeof activeConfigurationAction.loadSubitems === "function") {
+                activeConfigurationItem = item;
+                configurationItemSelectedIndex = 0;
+                const subitems = await activeConfigurationAction.loadSubitems(item, {
+                  cwd: currentCwd,
+                  dataHome,
+                  homeOptionName,
+                });
+                configurationSubitems = subitems.map((subitem) => ({ ...subitem, checkable: true }));
+                configurationStatus = "";
+                view = "configurationSubitems";
+                render();
+                return;
+              }
+
+              if (typeof activeConfigurationAction.applyItem !== "function") {
+                return;
+              }
+              const result = await activeConfigurationAction.applyItem(item, {
                 cwd: currentCwd,
                 dataHome,
                 homeOptionName,
@@ -479,7 +529,33 @@ function createSessionPicker({
               configurationStatus = result.status || `Selected ${item.label || item.name || "configuration"}.`;
               view = "configurations";
               activeConfigurationAction = null;
+              activeConfigurationItem = null;
               configurationItems = [];
+              configurationSubitems = [];
+            } catch (error) {
+              configurationStatus = error && error.message ? error.message : String(error);
+            }
+            render();
+            return;
+          }
+
+          if (view === "configurationSubitems") {
+            if (!activeConfigurationAction || typeof activeConfigurationAction.applySubitems !== "function") {
+              return;
+            }
+            try {
+              const selectedItems = configurationSubitems.filter((item) => item.selected);
+              const result = await activeConfigurationAction.applySubitems(activeConfigurationItem, selectedItems, {
+                cwd: currentCwd,
+                dataHome,
+                homeOptionName,
+              }) || {};
+              configurationStatus = result.status || `Selected ${selectedItems.length} configurations.`;
+              view = "configurations";
+              activeConfigurationAction = null;
+              activeConfigurationItem = null;
+              configurationItems = [];
+              configurationSubitems = [];
             } catch (error) {
               configurationStatus = error && error.message ? error.message : String(error);
             }
@@ -523,6 +599,15 @@ function createSessionPicker({
           if (view === "sessions") {
             const item = selectedSessionItem();
             enterPreview(item);
+            return;
+          }
+          if (view === "configurationSubitems") {
+            const index = clampSelectedIndex(configurationItemSelectedIndex, configurationSubitems.length);
+            const item = configurationSubitems[index];
+            if (item) {
+              configurationSubitems[index] = { ...item, selected: !item.selected };
+              render();
+            }
             return;
           }
         }
@@ -576,7 +661,17 @@ function createSessionPicker({
         if (key.name === "left" && view === "configurationItems") {
           view = "configurations";
           activeConfigurationAction = null;
+          activeConfigurationItem = null;
           configurationItems = [];
+          configurationSubitems = [];
+          render();
+          return;
+        }
+
+        if (key.name === "left" && view === "configurationSubitems") {
+          view = "configurationItems";
+          activeConfigurationItem = null;
+          configurationSubitems = [];
           render();
           return;
         }
@@ -587,6 +682,8 @@ function createSessionPicker({
           } else if (view === "configurations") {
             configurationSelectedIndex = Math.max(0, configurationSelectedIndex - 1);
           } else if (view === "configurationItems") {
+            configurationItemSelectedIndex = Math.max(0, configurationItemSelectedIndex - 1);
+          } else if (view === "configurationSubitems") {
             configurationItemSelectedIndex = Math.max(0, configurationItemSelectedIndex - 1);
           } else {
             sessionSelectedIndex = Math.max(0, sessionSelectedIndex - 1);
@@ -611,6 +708,11 @@ function createSessionPicker({
               Math.max(0, configurationItems.length - 1),
               configurationItemSelectedIndex + 1,
             );
+          } else if (view === "configurationSubitems") {
+            configurationItemSelectedIndex = Math.min(
+              Math.max(0, configurationSubitems.length - 1),
+              configurationItemSelectedIndex + 1,
+            );
           } else {
             sessionSelectedIndex = Math.min(
               Math.max(0, currentSessionItems().length - 1),
@@ -622,7 +724,7 @@ function createSessionPicker({
         }
 
         if (key.name === "backspace" || key.name === "delete") {
-          if (view === "configurations" || view === "configurationItems") {
+          if (view === "configurations" || view === "configurationItems" || view === "configurationSubitems") {
             return;
           }
           if (view === "workspaces") {
@@ -644,7 +746,7 @@ function createSessionPicker({
         }
 
         if (str && str >= " " && !key.ctrl && !key.meta) {
-          if (view === "configurations" || view === "configurationItems") {
+          if (view === "configurations" || view === "configurationItems" || view === "configurationSubitems") {
             return;
           }
           if (view === "workspaces") {

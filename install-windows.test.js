@@ -25,6 +25,7 @@ test("Windows installer contains required environment checks", () => {
   assert.match(script, /codex-sessions\.js/);
   assert.match(script, /\$CodexSourceDir/);
   assert.match(script, /opencode-sessions\.js/);
+  assert.match(script, /\$OpenCodeSourceDir/);
   assert.match(script, /CommonSourceDir/);
   assert.match(script, /CommonInstallDir/);
   assert.doesNotMatch(script, /CodexSupportScript/);
@@ -51,6 +52,7 @@ test("Windows installer installs under the shared install directory", () => {
   assert.doesNotMatch(script, /\.opencode-code-session/);
   assert.match(script, /Copy-Item/);
   assert.match(script, /Join-Path \$CodexSourceDir "\*\.js"/);
+  assert.match(script, /Join-Path \$OpenCodeSourceDir "\*\.js"/);
   assert.match(script, /\$HOME/);
 });
 

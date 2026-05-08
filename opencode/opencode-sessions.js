@@ -9,6 +9,7 @@ const {
   filterSessions,
   formatPicker,
   formatSessions: formatProviderSessions,
+  renderConfigurationPicker: renderProviderConfigurationPicker,
   renderInteractivePicker: renderProviderInteractivePicker,
   renderWorkspacePicker: renderProviderWorkspacePicker,
 } = require("../common/session-renderer");
@@ -19,6 +20,13 @@ const {
 } = require("../common/session-utils");
 const { pickAndRunProvider, runProviderCli } = require("../common/provider-runner");
 const { normalizeTranscriptMessages } = require("../common/session-transcript");
+const {
+  loadAiSdkProviders,
+  loadConfiguredModelChoices,
+  loadProviderModels,
+  saveConfiguredModel,
+  saveProviderModels,
+} = require("./opencode-provider-models");
 
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-session", "opencode.json");
 
@@ -224,6 +232,10 @@ function renderWorkspacePicker(options = {}) {
   return renderProviderWorkspacePicker({ ...options, title: "OpenCode workspaces" });
 }
 
+function renderConfigurationPicker(options = {}) {
+  return renderProviderConfigurationPicker(options);
+}
+
 function formatSessions(sessions) {
   return formatProviderSessions(sessions, { providerName: "OpenCode" });
 }
@@ -272,9 +284,47 @@ const pickSessionInteractive = createSessionPicker({
   filterSessions,
   renderInteractivePicker,
   renderWorkspacePicker,
+  renderConfigurationPicker,
   workspaceCwd: (workspace, currentCwd) => workspace.cwd || currentCwd,
   permissionModes: OPENCODE_PERMISSION_MODES,
   loadSessionTranscript,
+  configurationTitle: "OpenCode configurations",
+  configurationActions: [
+    {
+      name: "Provider models",
+      title: "OpenCode providers",
+      mode: "multiselect",
+      loadItems: () => loadAiSdkProviders(),
+      loadSubitems: (item) => loadProviderModels(item.name),
+      subitemsTitle: (item) => `OpenCode models: ${item.name}`,
+      applySubitems: (item, selectedItems) => {
+        const result = saveProviderModels(item.name, selectedItems.map((model) => model.name));
+        return { status: `Updated models for ${item.name}: ${result.selectedCount} selected` };
+      },
+      emptyMessage: "No @ai-sdk providers.",
+      emptySubitemsMessage: "No models.",
+    },
+    {
+      name: "Default model",
+      title: "OpenCode default model",
+      loadItems: () => loadConfiguredModelChoices("model"),
+      applyItem: (item) => {
+        const result = saveConfiguredModel("model", item.name);
+        return { status: `Updated default model: ${result.value}` };
+      },
+      emptyMessage: "No configured models.",
+    },
+    {
+      name: "Small model",
+      title: "OpenCode small model",
+      loadItems: () => loadConfiguredModelChoices("small_model"),
+      applyItem: (item) => {
+        const result = saveConfiguredModel("small_model", item.name);
+        return { status: `Updated small model: ${result.value}` };
+      },
+      emptyMessage: "No configured models.",
+    },
+  ],
 });
 
 const openCodeProvider = {
@@ -354,7 +404,7 @@ function usage() {
     "Usage: node opencode/opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]",
     "",
     "获取指定目录对应的 OpenCode sessions。默认读取当前目录和 ~/.local/share/opencode。",
-    "交互模式快捷键：Tab 切换 default/full permission，→ 选择 OpenCode 工作区，← 返回 session 列表。",
+    "交互模式快捷键：Tab 切换 default/full permission，→ 选择 OpenCode 工作区；在工作区列表中 → 进入 configurations。",
     "权限模式会自动记住，配置保存在 ~/.agent-session/opencode.json。",
     "",
     "Options:",
@@ -402,6 +452,7 @@ module.exports = {
   parseArgs,
   pickAndRunOpenCode,
   renderInteractivePicker,
+  renderConfigurationPicker,
   renderWorkspacePicker,
   selectedItemToCommand,
 };

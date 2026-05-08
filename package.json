@@ -8,8 +8,8 @@
     "opencode-code-session": "./opencode/opencode-sessions.js"
   },
   "scripts": {
-    "test": "node --test claude-sessions.test.js codex-sessions.test.js codex-model-providers.test.js opencode-sessions.test.js provider-runner.test.js install.test.js install-windows.test.js",
-    "check": "node --check claude/claude-sessions.js && node --check codex/codex-sessions.js && node --check codex/codex-model-providers.js && node --check opencode/opencode-sessions.js && node --check common/session-utils.js && node --check common/session-renderer.js && node --check common/session-transcript.js && node --check common/provider-runner.js && bash -n install.sh"
+    "test": "node --test claude-sessions.test.js codex-sessions.test.js codex-model-providers.test.js opencode-sessions.test.js opencode-provider-models.test.js provider-runner.test.js install.test.js install-windows.test.js",
+    "check": "node --check claude/claude-sessions.js && node --check codex/codex-sessions.js && node --check codex/codex-model-providers.js && node --check opencode/opencode-sessions.js && node --check opencode/opencode-provider-models.js && node --check common/session-utils.js && node --check common/session-renderer.js && node --check common/session-transcript.js && node --check common/provider-runner.js && bash -n install.sh"
   },
   "keywords": [
     "claude",

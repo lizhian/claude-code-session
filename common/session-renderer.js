@@ -627,6 +627,18 @@ function renderConfigurationPicker(options) {
   const start = Math.max(0, Math.min(selectedIndex - maxItemRows + 1, items.length - maxItemRows));
   const visibleItems = items.slice(start, start + maxItemRows);
   const numberWidth = Math.max(2, displayWidth(`${Math.max(0, items.length - 1)}.`));
+  const labelWidth = Math.max(
+    0,
+    ...visibleItems.map((item) => {
+      const marker = item.checkable ? "[x] " : "";
+      return displayWidth(`${marker}${item.label || item.name || "-"}`);
+    }),
+  );
+  const columnCount = Math.max(0, ...visibleItems.map((item) => (item.columns || []).length));
+  const columnWidths = Array.from({ length: columnCount }, (_, columnIndex) => Math.max(
+    0,
+    ...visibleItems.map((item) => displayWidth((item.columns || [])[columnIndex] || "")),
+  ));
   const lines = [
     fitLine(title, columns),
   ];
@@ -641,7 +653,8 @@ function renderConfigurationPicker(options) {
     const itemIndex = start + visibleOffset;
     const prefix = itemIndex === selectedIndex ? "> " : "  ";
     const number = `${itemIndex}.`;
-    const label = item.label || item.name || "-";
+    const marker = item.checkable ? `[${item.selected ? "x" : " "}] ` : "";
+    const label = `${marker}${item.label || item.name || "-"}`;
     const details = [];
 
     if (item.description) {
@@ -651,8 +664,15 @@ function renderConfigurationPicker(options) {
       details.push(item.config.base_url);
     }
 
-    const detailsText = details.length > 0 ? `  ${details.join("  ")}` : "";
-    const line = fitLine(`${prefix}${padDisplay(number, numberWidth, "right")} ${label}${detailsText}`, columns);
+    const columnText = (item.columns || [])
+      .map((column, columnIndex) => padDisplay(column, columnWidths[columnIndex]))
+      .join("  ");
+    const detailsText = details.length > 0 ? details.join("  ") : "";
+    const suffix = [columnText, detailsText].filter(Boolean).join("  ");
+    const line = fitLine(
+      `${prefix}${padDisplay(number, numberWidth, "right")} ${padDisplay(label, labelWidth)}${suffix ? `  ${suffix}` : ""}`,
+      columns,
+    );
     lines.push(itemIndex === selectedIndex ? colorize(line, ANSI.selectedSession, useColor) : line);
   });
 

@@ -61,6 +61,7 @@ _Avoid_: Flattened install files
 - A **Provider CLI** belongs to exactly one **Agent provider**.
 - An **Agent provider** may expose one or more **Model providers**.
 - Codex **Model provider selection state** is authoritative before Codex's native `model_provider` field.
+- OpenCode **Model providers** backed by `@ai-sdk/*` packages may refresh their configured model list from `options.baseURL`.
 - A **Public command** points at exactly one **Provider CLI**.
 - A **Provider CLI** may delegate **Public command** lifecycle behavior to a **Public command runner**.
 - A **Common support module** may be used by multiple **Provider CLIs**.
@@ -105,6 +106,15 @@ _Avoid_: Flattened install files
 > **Dev:** "When switching Codex **Model providers**, can we replace `auth.json` immediately?"
 > **Domain expert:** "No. First back up the current `auth.json` into the previously selected provider's `auth_json`; only then write the target provider's auth."
 
+> **Dev:** "Should OpenCode preserve comments and trailing commas when updating provider models?"
+> **Domain expert:** "No. It may read JSONC-style config but writes standard formatted JSON."
+
+> **Dev:** "How does OpenCode discover models for an `@ai-sdk/*` provider?"
+> **Domain expert:** "It calls `GET {options.baseURL}/models` with `Authorization: Bearer {options.apiKey}`, then writes selected IDs to `provider.<name>.models`."
+
+> **Dev:** "How does OpenCode choose its default models?"
+> **Domain expert:** "The OpenCode **Configurations page** selects from configured `provider.<name>.models` values and writes top-level `model` or `small_model` as `provider/model`."
+
 > **Dev:** "Should the **Session preview** show assistant replies too?"
 > **Domain expert:** "No. A **Session transcript** is a user-message view; assistant replies are intentionally excluded."
 
@@ -116,6 +126,8 @@ _Avoid_: Flattened install files
 - "CLI runner" is resolved as **Public command runner** when it refers to shared command lifecycle behavior.
 - "right key" is resolved as the keyboard right-arrow navigation from session list to workspace list, or from workspace list to **Configurations page**.
 - "codexuse" is resolved as the legacy standalone Codex **Model provider** switcher; the resolved flow is the Codex **Configurations page**.
+- "OpenCode provider models" is resolved as the OpenCode **Configurations page** action that edits `~/.config/opencode/opencode.json` `provider.<name>.models`.
+- "OpenCode default model" is resolved as the top-level `model` or `small_model` fields in `~/.config/opencode/opencode.json`, not provider model discovery.
 - "Claude renderer" is resolved as **Session renderer** once the formatting logic is shared by Codex and OpenCode.
 - "root files" is resolved as the legacy layout where Provider CLIs lived at the repository root; the resolved **Source layout** no longer keeps root Provider CLI files.
 - "preview messages" is resolved as **Session preview** backed by a lazily-loaded **Session transcript**, not the already-loaded session summary.

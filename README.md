@@ -17,7 +17,7 @@ Interactive session pickers for Claude Code, Codex, and OpenCode. Claude Code us
 - Remember the last selected permission mode.
 - Use zero-based picker numbering: `0` creates a new session, `1` resumes the first existing match.
 - Browse existing Claude Code, Codex, and OpenCode workspaces with the right arrow key.
-- Open Codex configuration actions from the workspace list.
+- Open Codex and OpenCode configuration actions from the workspace list.
 
 ## Requirements
 
@@ -86,6 +86,7 @@ Interactive controls:
 - `Tab` switches permission mode.
 - Right arrow opens workspace selection.
 - In Codex workspace selection, right arrow opens configurations and `Model provider` switches the global Codex model provider from `~/.codex/config.toml`.
+- In OpenCode workspace selection, right arrow opens configurations. `Provider models` syncs model IDs for `@ai-sdk/*` providers, while `Default model` and `Small model` update OpenCode's top-level `model` and `small_model`.
 - Left arrow returns to the previous picker view.
 - `Esc` or `Ctrl-C` cancels.
 
@@ -123,6 +124,8 @@ The selected OpenCode permission mode is saved to:
 ```bash
 ~/.agent-session/opencode.json
 ```
+
+OpenCode provider model configuration is read from `~/.config/opencode/opencode.json`. The picker supports JSONC-style input with comments and trailing commas, fetches models with `GET {baseURL}/models` using `options.apiKey`, writes selected model IDs to `provider.<name>.models`, and can update the top-level `model` and `small_model` fields as standard formatted JSON.
 
 ## CLI
 
