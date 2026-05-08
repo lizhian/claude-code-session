@@ -92,6 +92,13 @@ Interactive controls:
 
 Picker numbering starts at `0`: choose `0` or press Enter at the prompt to create a new session; choose `1` or above to resume an existing session.
 
+Configuration controls:
+
+- From the session list, press right arrow to open workspaces.
+- From the workspace list, press Enter to open sessions for that workspace.
+- From the workspace list, press right arrow to open provider configurations.
+- In multi-select configuration views, press Space to toggle an item and Enter to save.
+
 Permission modes:
 
 - Claude default: runs `claude`.
@@ -117,7 +124,14 @@ The selected Codex permission mode is saved to:
 ~/.agent-session/codex.json
 ```
 
-Codex model provider selection is saved in `~/.codex/config.toml` as `model_provider_selected`. Before switching providers, the picker backs up the current `~/.codex/auth.json` into the previous provider's `auth_json`. If no previous provider is known, it creates an `unknown-YYYYMMDD-HHmmss` provider with `name` and `auth_json` so current tokens are not lost.
+Codex model provider configuration:
+
+- Reads `~/.codex/config.toml`.
+- Lists `[model_providers.*]` entries under `Codex configurations` -> `Model provider`.
+- Stores the active picker-selected provider in top-level `model_provider_selected`.
+- Before switching providers, backs up the current `~/.codex/auth.json` into the previous provider's `auth_json`.
+- If no previous provider is known, creates an `unknown-YYYYMMDD-HHmmss` provider with `name` and `auth_json` so current tokens are not lost.
+- Updates Codex's native top-level `model_provider` only when the target provider has `base_url`; selecting a provider without `base_url` removes `model_provider`.
 
 The selected OpenCode permission mode is saved to:
 
@@ -125,7 +139,15 @@ The selected OpenCode permission mode is saved to:
 ~/.agent-session/opencode.json
 ```
 
-OpenCode provider model configuration is read from `~/.config/opencode/opencode.json`. The picker supports JSONC-style input with comments and trailing commas, fetches models with `GET {baseURL}/models` using `options.apiKey`, writes selected model IDs to `provider.<name>.models`, and can update the top-level `model` and `small_model` fields as standard formatted JSON.
+OpenCode configuration:
+
+- Reads `~/.config/opencode/opencode.json`.
+- Supports JSONC-style input with comments and trailing commas.
+- Writes back standard formatted JSON.
+- `Provider models` lists `@ai-sdk/*` providers with `options.baseURL` and `options.apiKey`, fetches models with `GET {baseURL}/models`, and writes selected model IDs to `provider.<name>.models`.
+- If a provider's own model endpoint returns an empty list, providers with the same origin and API key may be used as a fallback model-list source.
+- `Default model` writes top-level `model` as `provider/model`.
+- `Small model` writes top-level `small_model` as `provider/model`.
 
 ## CLI
 
@@ -149,9 +171,13 @@ Options:
 
 - `claude/claude-sessions.js`: Claude Code session CLI.
 - `codex/codex-sessions.js`: Codex session CLI.
+- `codex/codex-model-providers.js`: Codex model provider config parsing, auth backup, and provider switching.
 - `opencode/opencode-sessions.js`: OpenCode session CLI. It reads `opencode.db` through `sqlite3`.
+- `opencode/opencode-provider-models.js`: OpenCode provider model discovery and `opencode.json` updates.
 - `common/session-utils.js`: shared config, JSONL, process launching, workspace filtering, and interactive picker helpers.
 - `common/session-renderer.js`: shared session table, workspace list, and interactive picker rendering.
+- `common/session-transcript.js`: shared transcript normalization and preview limits.
+- `common/provider-runner.js`: shared provider CLI run flow for JSON, picker, and fallback prompt modes.
 - `*.test.js`: Node test files for provider behavior and installer behavior.
 - `install.sh` and `install.ps1`: installers for aliases/functions.
 

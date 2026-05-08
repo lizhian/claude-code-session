@@ -96,6 +96,13 @@ oc
 
 选择器编号从 `0` 开始：选择 `0` 或在非交互提示里直接回车会创建新 session；选择 `1` 及以上会恢复已有 session。
 
+配置快捷键：
+
+- 在 session 列表按右方向键进入 workspace 列表。
+- 在 workspace 列表按回车进入该 workspace 的 sessions。
+- 在 workspace 列表按右方向键进入 provider configurations。
+- 在多选配置页按 Space 切换选中状态，按 Enter 保存。
+
 权限模式：
 
 - Claude default：执行 `claude`。
@@ -121,7 +128,14 @@ Codex 权限模式会自动记住，配置保存到：
 ~/.agent-session/codex.json
 ```
 
-Codex model provider 选择状态会保存到 `~/.codex/config.toml` 的 `model_provider_selected`。切换 provider 前，picker 会先把当前 `~/.codex/auth.json` 回写到上一个 provider 的 `auth_json`。如果找不到上一个 provider，会创建一个 `unknown-YYYYMMDD-HHmmss` provider，并写入 `name` 和 `auth_json`，避免当前 token 丢失。
+Codex model provider 配置：
+
+- 读取 `~/.codex/config.toml`。
+- 在 `Codex configurations` -> `Model provider` 中列出 `[model_providers.*]`。
+- 使用顶层 `model_provider_selected` 记录 picker 当前选择的 provider。
+- 切换 provider 前，先把当前 `~/.codex/auth.json` 回写到上一个 provider 的 `auth_json`。
+- 如果找不到上一个 provider，会创建一个 `unknown-YYYYMMDD-HHmmss` provider，并写入 `name` 和 `auth_json`，避免当前 token 丢失。
+- 目标 provider 有 `base_url` 时更新 Codex 原生顶层 `model_provider`；选择没有 `base_url` 的 provider 时删除 `model_provider`。
 
 OpenCode 权限模式会自动记住，配置保存到：
 
@@ -129,7 +143,15 @@ OpenCode 权限模式会自动记住，配置保存到：
 ~/.agent-session/opencode.json
 ```
 
-OpenCode provider model 配置读取 `~/.config/opencode/opencode.json`。picker 支持带注释和尾随逗号的 JSONC 风格输入，使用 `options.apiKey` 请求 `GET {baseURL}/models`，把选中的模型 ID 写入 `provider.<name>.models`，也可以更新顶层 `model` 和 `small_model`，写回时会格式化为标准 JSON。
+OpenCode 配置：
+
+- 读取 `~/.config/opencode/opencode.json`。
+- 支持带注释和尾随逗号的 JSONC 风格输入。
+- 写回时格式化为标准 JSON。
+- `Provider models` 会列出带 `options.baseURL` 和 `options.apiKey` 的 `@ai-sdk/*` providers，使用 `GET {baseURL}/models` 拉取模型，并把选中的模型 ID 写入 `provider.<name>.models`。
+- 如果某个 provider 自己的模型接口返回空列表，会尝试使用同 origin、同 API key 的其它 provider 作为模型列表来源。
+- `Default model` 写入顶层 `model`，格式为 `provider/model`。
+- `Small model` 写入顶层 `small_model`，格式为 `provider/model`。
 
 ## CLI
 
@@ -153,9 +175,13 @@ node opencode/opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-
 
 - `claude/claude-sessions.js`：Claude Code session CLI。
 - `codex/codex-sessions.js`：Codex session CLI。
+- `codex/codex-model-providers.js`：Codex model provider 配置解析、auth 备份和 provider 切换逻辑。
 - `opencode/opencode-sessions.js`：OpenCode session CLI，通过 `sqlite3` 读取 `opencode.db`。
+- `opencode/opencode-provider-models.js`：OpenCode provider model 发现和 `opencode.json` 更新逻辑。
 - `common/session-utils.js`：共享的配置、JSONL、进程启动、工作区过滤和交互式 picker 辅助逻辑。
 - `common/session-renderer.js`：共享的 session 表格、workspace 列表和交互式 picker 渲染逻辑。
+- `common/session-transcript.js`：共享的 transcript 规范化和预览条数限制逻辑。
+- `common/provider-runner.js`：共享的 provider CLI 运行流程，覆盖 JSON、picker 和非 TTY prompt 模式。
 - `*.test.js`：基于 Node test 的 provider 行为和安装器行为测试。
 - `install.sh` 和 `install.ps1`：安装 alias/function 的脚本。
 
