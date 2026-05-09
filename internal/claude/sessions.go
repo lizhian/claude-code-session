@@ -220,7 +220,16 @@ func listSessions(cwd, claudeHome string) []provider.Session {
 	sort.Slice(sessions, func(i, j int) bool {
 		return sessions[i].UpdatedAt > sessions[j].UpdatedAt
 	})
-	return sessions
+
+	// Filter out empty sessions: only an init record with no user messages.
+	filtered := make([]provider.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if s.MessageCount <= 1 && s.FirstUserMessage == "" && s.LastUserMessage == "" {
+			continue
+		}
+		filtered = append(filtered, s)
+	}
+	return filtered
 }
 
 func listProjectSessions(projectDir string) []provider.Session {
@@ -240,7 +249,15 @@ func listProjectSessions(projectDir string) []provider.Session {
 	sort.Slice(sessions, func(i, j int) bool {
 		return sessions[i].UpdatedAt > sessions[j].UpdatedAt
 	})
-	return sessions
+
+	filtered := make([]provider.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if s.MessageCount <= 1 && s.FirstUserMessage == "" && s.LastUserMessage == "" {
+			continue
+		}
+		filtered = append(filtered, s)
+	}
+	return filtered
 }
 
 func summarizeWorkspace(projectDir string) *provider.Workspace {

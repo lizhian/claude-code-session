@@ -374,6 +374,9 @@ func listSessions(cwd, codexHome string) []provider.Session {
 	for _, file := range codexSessionFiles(codexHome) {
 		s := summarizeSession(file)
 		if s.Cwd != "" && filepath.Clean(s.Cwd) == cwd {
+			if s.MessageCount <= 1 && s.FirstUserMessage == "" && s.LastUserMessage == "" {
+				continue
+			}
 			filtered = append(filtered, s)
 		}
 	}

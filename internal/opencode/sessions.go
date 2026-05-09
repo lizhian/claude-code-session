@@ -235,6 +235,9 @@ func listSessions(cwd, dataHome string) []provider.Session {
 	for _, row := range rows {
 		s := summarizeSession(row, dbPath)
 		if s.Cwd != "" && filepath.Clean(s.Cwd) == filepath.Clean(cwd) {
+			if s.MessageCount <= 1 && s.FirstUserMessage == "" && s.LastUserMessage == "" {
+				continue
+			}
 			filtered = append(filtered, s)
 		}
 	}
