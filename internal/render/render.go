@@ -18,6 +18,7 @@ var (
 	ANSIPermFull       = "\x1b[31m"
 	ANSIPreviewMeta    = "\x1b[36m"
 	ANSIPreviewMuted   = "\x1b[90m"
+	ANSIPreviewOmitted = "\x1b[33m"
 	ANSISelected       = "\x1b[36m"
 	ANSISelectedConfig = "\x1b[34m"
 )

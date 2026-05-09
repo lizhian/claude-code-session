@@ -816,7 +816,9 @@ func (m Model) renderPreview() string {
 		for i, msg := range m.previewTranscript {
 			bodyLines = append(bodyLines, "")
 			if msg.Role == "omitted" {
-				bodyLines = append(bodyLines, render.Colorize(render.FitLine(msg.Text, m.width), render.ANSIPreviewMuted, m.useColor))
+				for _, omittedLine := range []string{".", ".", ".", msg.Text, ".", ".", "."} {
+					bodyLines = append(bodyLines, render.Colorize(render.FitLine(omittedLine, m.width), render.ANSIPreviewOmitted, m.useColor))
+				}
 				continue
 			}
 			lastMessageStart = len(bodyLines) - 1
@@ -826,9 +828,6 @@ func (m Model) renderPreview() string {
 			}
 			role := strings.ToLower(msg.Role)
 			color := render.ANSIPreviewMeta
-			if role == "assistant" {
-				color = render.ANSIPreviewMuted
-			}
 			header := render.Colorize(
 				fmt.Sprintf("#%d %s %s", ordinal, role, render.FormatSessionTime(msg.Timestamp, now)),
 				color,
