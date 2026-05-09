@@ -144,14 +144,20 @@ _agent_session_run() {
   local cmd="\$1"
   shift
   local cwd_file
+  local start_dir
   cwd_file="\$(mktemp)" || return
+  start_dir="\$PWD"
   AGENT_SESSION_CWD_FILE="\$cwd_file" "$BINARY_PATH" "\$cmd" "\$@"
   local exit_status=\$?
   if [ -s "\$cwd_file" ]; then
     local target_dir
     target_dir="\$(tail -n 1 "\$cwd_file")"
-    if [ -n "\$target_dir" ] && [ -d "\$target_dir" ]; then
-      cd "\$target_dir" || exit_status=\$?
+    if [ -n "\$target_dir" ] && [ -d "\$target_dir" ] && [ "\$target_dir" != "\$start_dir" ]; then
+      if cd "\$target_dir"; then
+        printf 'agent-session: cd %s\n' "\$target_dir"
+      else
+        exit_status=\$?
+      fi
     fi
   fi
   rm -f "\$cwd_file"
