@@ -95,6 +95,10 @@ func (p *CodexProvider) ConfigurationActions() []provider.ConfigAction {
 		{
 			Name:         "Model provider",
 			Title:        "Codex model providers",
+			Columns: func(ctx provider.Context) []provider.ConfigColumn {
+				name := currentCodexProviderColumn(ctx.DataHome)
+				return []provider.ConfigColumn{{Name: "provider", Value: name}}
+			},
 			EmptyMessage: "No model providers.",
 			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
 				return loadModelProviderItems(ctx.DataHome)
@@ -178,6 +182,17 @@ func SummaryLines(cwd, codexHome string, sessions []provider.Session) []string {
 		"Codex home: " + codexHome,
 		fmt.Sprintf("Sessions: %d", len(sessions)),
 	}
+}
+
+// currentCodexProviderColumn returns the currently selected provider name.
+func currentCodexProviderColumn(codexHome string) string {
+	configPath := codexConfigPath(codexHome)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return ""
+	}
+	_, _, selected := parseTomlProviders(string(data))
+	return selected
 }
 
 // loadModelProviderItems loads model providers from the Codex config.
