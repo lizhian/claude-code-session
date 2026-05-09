@@ -10,8 +10,47 @@ info() {
   printf '%s\n' "$1"
 }
 
-command -v node >/dev/null 2>&1 || fail "node is required but was not found in PATH."
+# --- Detect platform ---
+OS="$(uname -s)"
+ARCH="$(uname -m)"
 
+case "$OS" in
+  Darwin) GOOS="darwin" ;;
+  Linux)  GOOS="linux" ;;
+  *)      fail "Unsupported OS: $OS" ;;
+esac
+
+case "$ARCH" in
+  x86_64|amd64)         GOARCH="amd64" ;;
+  arm64|aarch64)        GOARCH="arm64" ;;
+  *)                    fail "Unsupported architecture: $ARCH" ;;
+esac
+
+SUFFIX="${GOOS}-${GOARCH}"
+if [[ "$GOOS" == "windows" ]]; then
+  SUFFIX="${SUFFIX}.exe"
+fi
+
+# --- Configuration ---
+REPO="lizhian/agent-session"
+INSTALL_DIR="$HOME/.agent-session/bin"
+BINARY_NAME="agent-session"
+BINARY_PATH="$INSTALL_DIR/$BINARY_NAME"
+
+# Allow overriding the version to install.
+# Defaults to the latest GitHub release.
+VERSION="${INSTALL_VERSION:-latest}"
+
+if [[ "$VERSION" == "latest" ]]; then
+  info "Fetching latest release from ${REPO}..."
+  RELEASE_URL="https://github.com/${REPO}/releases/latest/download/agent-session-${SUFFIX}"
+else
+  RELEASE_URL="https://github.com/${REPO}/releases/download/${VERSION}/agent-session-${SUFFIX}"
+fi
+
+CHECKSUM_URL="$(dirname "$RELEASE_URL")/checksums.txt"
+
+# --- Check for existing agent CLIs ---
 has_claude=false
 has_codex=false
 has_opencode=false
@@ -38,118 +77,92 @@ if [[ "$has_claude" != true && "$has_codex" != true && "$has_opencode" != true ]
   fail "No supported agent CLI found in PATH. Install claude, codex, or opencode first."
 fi
 
-if [[ "$has_opencode" == true ]] && ! command -v sqlite3 >/dev/null 2>&1; then
-  printf 'Warning: sqlite3 was not found in PATH. The oc alias requires sqlite3 to read OpenCode sessions.\n' >&2
+# --- Download ---
+info "Downloading agent-session (${SUFFIX})..."
+mkdir -p "$INSTALL_DIR"
+
+HTTP_CODE=$(curl -fsSL -w "%{http_code}" -o "$BINARY_PATH" "$RELEASE_URL") || true
+
+if [[ "$HTTP_CODE" != "200" ]]; then
+  rm -f "$BINARY_PATH"
+  fail "Failed to download from $RELEASE_URL (HTTP $HTTP_CODE). Check that the release exists."
 fi
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-common_source_dir="$script_dir/common"
-claude_source_dir="$script_dir/claude"
-codex_source_dir="$script_dir/codex"
-opencode_source_dir="$script_dir/opencode"
-claude_source_script="$script_dir/claude/claude-sessions.js"
-codex_source_script="$script_dir/codex/codex-sessions.js"
-opencode_source_script="$script_dir/opencode/opencode-sessions.js"
-install_dir="$HOME/.agent-session"
-common_install_dir="$install_dir/common"
-claude_install_dir="$install_dir/claude"
-codex_install_dir="$install_dir/codex"
-opencode_install_dir="$install_dir/opencode"
-installed_script="$claude_install_dir/claude-sessions.js"
-codex_installed_script="$codex_install_dir/codex-sessions.js"
-opencode_installed_script="$opencode_install_dir/opencode-sessions.js"
-alias_line="alias cc='$installed_script --pick --trust-current-folder'"
-codex_alias_line="alias cx='$codex_installed_script --pick --trust-current-folder'"
-opencode_alias_line="alias oc='$opencode_installed_script --pick --trust-current-folder'"
-marker="# Claude Code session picker"
-codex_marker="# Codex session picker"
-opencode_marker="# OpenCode session picker"
+chmod 755 "$BINARY_PATH"
+info "Installed agent-session to $BINARY_PATH"
 
-[[ -f "$common_source_dir/session-utils.js" ]] || fail "common/session-utils.js was not found next to install.sh."
-[[ -f "$common_source_dir/session-renderer.js" ]] || fail "common/session-renderer.js was not found next to install.sh."
-if [[ "$has_claude" == true ]]; then
-  [[ -f "$claude_source_script" ]] || fail "claude/claude-sessions.js was not found next to install.sh."
+# --- Verify checksum ---
+CHECKSUM_FILE="$(mktemp)"
+if curl -fsSL -o "$CHECKSUM_FILE" "$CHECKSUM_URL" 2>/dev/null; then
+  EXPECTED="$(grep "agent-session-${SUFFIX}$" "$CHECKSUM_FILE" | awk '{print $1}')"
+  if [[ -n "$EXPECTED" ]]; then
+    ACTUAL="$(shasum -a 256 "$BINARY_PATH" | awk '{print $1}')"
+    if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+      rm -f "$BINARY_PATH"
+      fail "Checksum mismatch: expected $EXPECTED, got $ACTUAL"
+    fi
+    info "Checksum verified."
+  fi
 fi
-if [[ "$has_codex" == true ]]; then
-  [[ -f "$codex_source_script" ]] || fail "codex/codex-sessions.js was not found next to install.sh."
-fi
-if [[ "$has_opencode" == true ]]; then
-  [[ -f "$opencode_source_script" ]] || fail "opencode/opencode-sessions.js was not found next to install.sh."
-fi
+rm -f "$CHECKSUM_FILE"
 
+# --- Create symlinks ---
+ln -sf "$BINARY_PATH" "$INSTALL_DIR/cc"
+ln -sf "$BINARY_PATH" "$INSTALL_DIR/cx"
+ln -sf "$BINARY_PATH" "$INSTALL_DIR/oc"
+
+# --- Add to PATH in shell rc ---
 if [[ -n "${SHELL:-}" && "$(basename "$SHELL")" == "bash" ]]; then
   shell_rc="$HOME/.bashrc"
 else
   shell_rc="$HOME/.zshrc"
 fi
 
-mkdir -p "$common_install_dir"
-cp "$common_source_dir"/*.js "$common_install_dir/"
-
-if [[ "$has_claude" == true ]]; then
-  mkdir -p "$claude_install_dir"
-  cp "$claude_source_dir"/*.js "$claude_install_dir/"
-  chmod 755 "$installed_script"
-fi
-
-if [[ "$has_codex" == true ]]; then
-  mkdir -p "$codex_install_dir"
-  cp "$codex_source_dir"/*.js "$codex_install_dir/"
-  chmod 755 "$codex_installed_script"
-fi
-
-if [[ "$has_opencode" == true ]]; then
-  mkdir -p "$opencode_install_dir"
-  cp "$opencode_source_dir"/*.js "$opencode_install_dir/"
-  chmod 755 "$opencode_installed_script"
-fi
+marker="# agent-session PATH"
 touch "$shell_rc"
 
+# Remove old agent-session markers.
 tmp_file="$(mktemp)"
-awk -v marker="$marker" -v codex_marker="$codex_marker" -v opencode_marker="$opencode_marker" '
-  $0 == marker || $0 == codex_marker || $0 == opencode_marker {
-    getline
-    next
-  }
+awk -v marker="$marker" '
+  $0 == marker { getline; next }
   { print }
 ' "$shell_rc" > "$tmp_file"
 mv "$tmp_file" "$shell_rc"
 
-{
-  if [[ "$has_claude" == true ]]; then
-    printf '\n%s\n' "$marker"
-    printf '%s\n' "$alias_line"
-  fi
-  if [[ "$has_codex" == true ]]; then
-    printf '\n%s\n' "$codex_marker"
-    printf '%s\n' "$codex_alias_line"
-  fi
-  if [[ "$has_opencode" == true ]]; then
-    printf '\n%s\n' "$opencode_marker"
-    printf '%s\n' "$opencode_alias_line"
-  fi
-} >> "$shell_rc"
+if [[ ":${PATH}:" != *":$INSTALL_DIR:"* ]]; then
+  printf '\n%s\nexport PATH="%s:\$PATH"\n' "$marker" "$INSTALL_DIR" >> "$shell_rc"
+  info "Added $INSTALL_DIR to PATH in $shell_rc"
+fi
+
+# --- Remove old JS aliases if present ---
+js_markers=("# Claude Code session picker" "# Codex session picker" "# OpenCode session picker")
+js_tmp="$(mktemp)"
+awk_script=""
+for m in "${js_markers[@]}"; do
+  awk_script="${awk_script}  \$0 == \"${m}\" { getline; next }
+"
+done
+awk "${awk_script}
+{ print }" "$shell_rc" > "$js_tmp"
+mv "$js_tmp" "$shell_rc"
 
 available_aliases=""
 if [[ "$has_claude" == true ]]; then
-  info "Installed claude/claude-sessions.js to $installed_script"
-  info "Added alias cc to $shell_rc"
   available_aliases="cc"
 fi
 if [[ "$has_codex" == true ]]; then
-  info "Installed codex/codex-sessions.js to $codex_installed_script"
-  info "Added alias cx to $shell_rc"
   if [[ -n "$available_aliases" ]]; then
     available_aliases+=", "
   fi
   available_aliases+="cx"
 fi
 if [[ "$has_opencode" == true ]]; then
-  info "Installed opencode/opencode-sessions.js to $opencode_installed_script"
-  info "Added alias oc to $shell_rc"
   if [[ -n "$available_aliases" ]]; then
     available_aliases+=", "
   fi
   available_aliases+="oc"
 fi
-info "Run 'source $shell_rc' or open a new terminal, then use: $available_aliases"
+
+info ""
+info "Done! Run 'source $shell_rc' or open a new terminal, then use: $available_aliases"
+info "Binary: $BINARY_PATH ($(du -h "$BINARY_PATH" | cut -f1))"
