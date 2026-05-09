@@ -62,9 +62,10 @@ type CommandSpec struct {
 
 // ConfigItem is a selectable item in a configuration view.
 type ConfigItem struct {
-	Name     string `json:"name"`
-	Label    string `json:"label,omitempty"`
-	Selected bool   `json:"selected,omitempty"`
+	Name     string         `json:"name"`
+	Label    string         `json:"label,omitempty"`
+	Selected bool           `json:"selected,omitempty"`
+	Columns []ConfigColumn `json:"columns,omitempty"`
 }
 
 // ConfigColumn describes a column to display in a configuration list.

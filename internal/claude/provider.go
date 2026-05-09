@@ -109,10 +109,18 @@ func (p *ClaudeProvider) ConfigurationActions() []provider.ConfigAction {
 				}
 				items := make([]provider.ConfigItem, len(entries))
 				for i, e := range entries {
+					// Show the provider's base_url as a column.
+					url := ""
+					if e.Provider != nil {
+						if u, ok := e.Provider["ANTHROPIC_BASE_URL"].(string); ok {
+							url = u
+						}
+					}
 					items[i] = provider.ConfigItem{
 						Name:     e.Name,
 						Label:    e.Label,
 						Selected: e.Selected,
+						Columns: []provider.ConfigColumn{{Name: "url", Value: url}},
 					}
 				}
 				return items, nil

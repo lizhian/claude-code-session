@@ -816,18 +816,36 @@ func (m Model) renderConfigurations() string {
 		}
 	}
 
+	// Render the action-level columns (current values) next to each action name.
+	ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
+
 	maxItemRows := max(1, m.height-6)
 	start := max(0, min(idx-maxItemRows+1, len(items)-maxItemRows))
 	visibleItems := items[start:min(start+maxItemRows, len(items))]
 
-	for vi, item := range visibleItems {
+	for vi, action := range visibleItems {
 		itemIndex := start + vi
 		prefix := "  "
 		if itemIndex == idx {
 			prefix = "> "
 		}
 
-		line := fmt.Sprintf("%s%s %s", prefix, render.PadDisplay(fmt.Sprintf("%d.", itemIndex), numberWidth, "right"), item.Name)
+		line := fmt.Sprintf("%s%s %s", prefix, render.PadDisplay(fmt.Sprintf("%d.", itemIndex), numberWidth, "right"), action.Name)
+
+		// Append action-level columns (current value preview).
+		if action.Columns != nil {
+			cols := action.Columns(ctx)
+			var colTexts []string
+			for _, col := range cols {
+				if col.Value != "" {
+					colTexts = append(colTexts, col.Value)
+				}
+			}
+			if len(colTexts) > 0 {
+				line += "  " + strings.Join(colTexts, "  ")
+			}
+		}
+
 		fittedLine := render.FitLine(line, m.width)
 		if itemIndex == idx {
 			fittedLine = render.Colorize(fittedLine, render.ANSISelected, m.useColor)
@@ -866,6 +884,15 @@ func (m Model) renderConfigurationItems() string {
 	numberWidth := 2
 	labelWidth := 0
 
+	// Calculate column widths from visible items.
+	columnCount := 0
+	for _, item := range m.configItems {
+		if len(item.Columns) > columnCount {
+			columnCount = len(item.Columns)
+		}
+	}
+	columnWidths := make([]int, columnCount)
+
 	for i, item := range m.configItems {
 		num := fmt.Sprintf("%d.", i)
 		if len(num) > numberWidth {
@@ -874,6 +901,12 @@ func (m Model) renderConfigurationItems() string {
 		lw := render.DisplayWidth(item.Label)
 		if lw > labelWidth {
 			labelWidth = lw
+		}
+		for ci, col := range item.Columns {
+			cw := render.DisplayWidth(col.Value)
+			if cw > columnWidths[ci] {
+				columnWidths[ci] = cw
+			}
 		}
 	}
 
@@ -884,7 +917,22 @@ func (m Model) renderConfigurationItems() string {
 			prefix = "> "
 		}
 
-		line := fmt.Sprintf("%s%s %s", prefix, render.PadDisplay(fmt.Sprintf("%d.", itemIndex), numberWidth, "right"), render.PadDisplay(item.Label, labelWidth, "left"))
+		// Build the label part.
+		labelPart := render.PadDisplay(item.Label, labelWidth, "left")
+
+		// Build the columns suffix.
+		var colParts []string
+		for ci, col := range item.Columns {
+			if ci < len(columnWidths) {
+				colParts = append(colParts, render.PadDisplay(col.Value, columnWidths[ci], "left"))
+			}
+		}
+		suffix := strings.Join(colParts, "  ")
+
+		line := fmt.Sprintf("%s%s %s", prefix, render.PadDisplay(fmt.Sprintf("%d.", itemIndex), numberWidth, "right"), labelPart)
+		if suffix != "" {
+			line += "  " + suffix
+		}
 		fittedLine := render.FitLine(line, m.width)
 		if itemIndex == idx {
 			fittedLine = render.Colorize(fittedLine, render.ANSISelected, m.useColor)
