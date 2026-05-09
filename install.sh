@@ -130,7 +130,8 @@ awk -v marker="$marker" '
 mv "$tmp_file" "$shell_rc"
 
 if [[ ":${PATH}:" != *":$INSTALL_DIR:"* ]]; then
-  printf '\n%s\nexport PATH="%s:\$PATH"\n' "$marker" "$INSTALL_DIR" >> "$shell_rc"
+  printf '\n%s\nexport PATH="%s' "$marker" "$INSTALL_DIR" >> "$shell_rc"
+  printf ':$PATH"\n' >> "$shell_rc"
   info "Added $INSTALL_DIR to PATH in $shell_rc"
 fi
 
