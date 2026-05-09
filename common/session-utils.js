@@ -137,6 +137,10 @@ function clampSelectedIndex(selectedIndex, itemCount) {
   return Math.min(Math.max(0, selectedIndex), itemCount - 1);
 }
 
+function defaultSessionSelectedIndex(sessions) {
+  return Array.isArray(sessions) && sessions.length > 0 ? 1 : 0;
+}
+
 function resolveSessionChoice(sessions, choice) {
   const normalized = String(choice || "").trim();
   if (normalized === "" || normalized === "0") {
@@ -261,7 +265,7 @@ function createSessionPicker({
     );
     let sessionQuery = "";
     let workspaceQuery = "";
-    let sessionSelectedIndex = 0;
+    let sessionSelectedIndex = defaultSessionSelectedIndex(sessions);
     let workspaceSelectedIndex = 0;
     let configurationSelectedIndex = 0;
     let configurationItemSelectedIndex = 0;
@@ -608,7 +612,7 @@ function createSessionPicker({
               sessions = listSessions({ cwd: currentCwd, [homeOptionName]: dataHome });
               view = "sessions";
               sessionQuery = "";
-              sessionSelectedIndex = 0;
+              sessionSelectedIndex = defaultSessionSelectedIndex(sessions);
               resetPreview();
               previousQueryHadText = false;
               render();
@@ -775,7 +779,7 @@ function createSessionPicker({
             if (view === "workspaces") {
               workspaceSelectedIndex = 0;
             } else {
-              sessionSelectedIndex = 0;
+              sessionSelectedIndex = defaultSessionSelectedIndex(sessions);
             }
           }
           render();
@@ -812,6 +816,7 @@ module.exports = {
   askQuestion,
   clampSelectedIndex,
   createSessionPicker,
+  defaultSessionSelectedIndex,
   filterWorkspaces,
   loadLaunchMode,
   loadPermissionMode,

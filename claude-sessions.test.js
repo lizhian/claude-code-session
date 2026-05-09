@@ -25,7 +25,7 @@ const {
   truncateToWidth,
   listSessions,
 } = require("./claude/claude-sessions");
-const { createSessionPicker } = require("./common/session-utils");
+const { createSessionPicker, defaultSessionSelectedIndex } = require("./common/session-utils");
 const { renderConfigurationPicker } = require("./common/session-renderer");
 const { normalizeTranscriptMessages } = require("./common/session-transcript");
 
@@ -292,6 +292,11 @@ test("rejects invalid picker choices", () => {
     () => buildClaudeCommand([{ id: "11111111-2222-3333-4444-555555555555" }], "2"),
     /Invalid choice/,
   );
+});
+
+test("defaults the interactive picker to the newest session when sessions exist", () => {
+  assert.equal(defaultSessionSelectedIndex([{ id: "11111111-2222-3333-4444-555555555555" }]), 1);
+  assert.equal(defaultSessionSelectedIndex([]), 0);
 });
 
 test("formats relative times for the picker", () => {
@@ -578,8 +583,6 @@ test("space previews selected sessions and escape returns to the session list", 
   });
 
   await new Promise((resolve) => setImmediate(resolve));
-  input.emit("keypress", "", { name: "down" });
-  await new Promise((resolve) => setImmediate(resolve));
   input.emit("keypress", " ", { name: "space" });
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(rendered, /Transcript: 2 user messages/);
@@ -641,8 +644,6 @@ test("preview rendering clears scrollback so previous session messages are remov
     claudeHome: os.tmpdir(),
   });
 
-  await new Promise((resolve) => setImmediate(resolve));
-  input.emit("keypress", "", { name: "down" });
   await new Promise((resolve) => setImmediate(resolve));
   input.emit("keypress", " ", { name: "space" });
   await new Promise((resolve) => setImmediate(resolve));
@@ -766,7 +767,8 @@ test("workspace right arrow opens configurations and enter applies a configurati
   input.emit("keypress", "", { name: "return" });
   const result = await picked;
   assert.equal(result.cwd, "/tmp/payment-api");
-  assert.equal(result.item.type, "new");
+  assert.equal(result.item.type, "session");
+  assert.equal(result.item.session.cwd, "/tmp/payment-api");
 });
 
 test("Claude configurations show model actions in order with current model names", async () => {
