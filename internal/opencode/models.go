@@ -291,22 +291,20 @@ func loadProviderModels(providerName string) ([]provider.ConfigItem, error) {
 		configuredSet[n] = true
 	}
 
-	// Merge configured + remote, keeping configured models first and de-duplicating names.
+	// Merge remote + configured, preserving remote order.
+	// Configured-only models are appended after remote results and marked as configured.
 	remoteSet := make(map[string]bool)
-	for _, n := range remoteNames {
-		remoteSet[n] = true
-	}
-
 	seen := make(map[string]bool)
 	var allNames []string
-	for _, n := range configured {
+	for _, n := range remoteNames {
 		if n == "" || seen[n] {
 			continue
 		}
 		allNames = append(allNames, n)
+		remoteSet[n] = true
 		seen[n] = true
 	}
-	for _, n := range remoteNames {
+	for _, n := range configured {
 		if n == "" || seen[n] {
 			continue
 		}
@@ -321,7 +319,7 @@ func loadProviderModels(providerName string) ([]provider.ConfigItem, error) {
 			Label:    name,
 			Selected: configuredSet[name],
 		}
-		if !remoteSet[name] || configuredSet[name] {
+		if !remoteSet[name] {
 			items[i].Columns = []provider.ConfigColumn{{Value: "configured"}}
 		}
 	}

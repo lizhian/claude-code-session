@@ -1020,7 +1020,7 @@ func (m Model) renderConfigurationSubitems() string {
 
 		marker := "[ ] "
 		if item.Selected {
-			marker = "[x] "
+			marker = "[✔] "
 		}
 
 		line := fmt.Sprintf("%s%s %s%s", prefix, render.PadDisplay(fmt.Sprintf("%d.", itemIndex), numberWidth, "right"), marker, item.Label)
