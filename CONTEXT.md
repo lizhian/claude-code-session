@@ -41,7 +41,7 @@ A **Common support module** that formats session lists, workspace lists, and int
 _Avoid_: Claude renderer
 
 **Session preview**:
-A temporary picker view for reading the selected session's user-message transcript before reopening it.
+A temporary picker view for reading the selected session's **Conversation transcript** before reopening it.
 _Avoid_: Editor-like transcript browser
 
 **Configurations page**:
@@ -56,9 +56,9 @@ _Avoid_: Session list
 Environment fields inside an **Agent provider** config that belong to the selected **Model provider**.
 _Avoid_: All env fields
 
-**Session transcript**:
-Provider-loaded chronological user messages for one session.
-_Avoid_: Session summary
+**Conversation transcript**:
+Provider-loaded chronological useful dialogue messages for one session, including user messages and assistant replies.
+_Avoid_: Session summary, user-only transcript
 
 **Source layout**:
 The repository directory structure that separates **Provider CLIs** into provider folders and shared scripts into `common/`.
@@ -89,11 +89,11 @@ _Avoid_: Flattened install files
 - A **Common support module** may be used by multiple **Provider CLIs**.
 - **Provider CLIs** keep provider-specific behavior separate from **Common support modules**.
 - A **Session renderer** may be used by any **Provider CLI**.
-- A **Session preview** belongs to the session picker and loads a **Session transcript** lazily.
+- A **Session preview** belongs to the session picker and loads a **Conversation transcript** lazily.
 - A **Configurations page** is reached from a workspace list and belongs to the current **Agent provider**.
 - A **Multi-select configuration list** uses blue for selected choices and cyan only for the current unselected cursor row.
-- **Provider CLIs** own **Session transcript** loading because session storage differs by **Agent provider**.
-- A **Session renderer** owns **Session transcript** display; terminal scrollback owns long-preview scrolling.
+- **Provider CLIs** own **Conversation transcript** loading because session storage differs by **Agent provider**.
+- A **Session renderer** owns **Conversation transcript** display; terminal scrollback owns long-preview scrolling.
 - The **Install layout** mirrors the **Source layout** so relative imports stay the same after installation.
 - Tests may remain at the repository root while importing provider modules from the **Source layout**.
 
@@ -115,7 +115,7 @@ _Avoid_: Flattened install files
 > **Domain expert:** "No. The **Install layout** mirrors the **Source layout** so `common/`, `claude/`, `codex/`, and `opencode/` exist in both places."
 
 > **Dev:** "Does pressing Space load every session transcript upfront?"
-> **Domain expert:** "No. Space opens a **Session preview** and lazily loads the selected session's **Session transcript**."
+> **Domain expert:** "No. Space opens a **Session preview** and lazily loads the selected session's **Conversation transcript**."
 
 > **Dev:** "In the workspace list, does Enter open configuration actions?"
 > **Domain expert:** "No. Enter opens the selected workspace's sessions; the right arrow opens the **Configurations page**."
@@ -172,7 +172,7 @@ _Avoid_: Flattened install files
 > **Domain expert:** "The OpenCode **Configurations page** selects from configured `provider.<name>.models` values and writes top-level `model` or `small_model` as `provider/model`."
 
 > **Dev:** "Should the **Session preview** show assistant replies too?"
-> **Domain expert:** "No. A **Session transcript** is a user-message view; assistant replies are intentionally excluded."
+> **Domain expert:** "Yes. A **Conversation transcript** includes useful user messages and assistant replies, while excluding tool noise and internal events."
 
 ## Flagged ambiguities
 
@@ -188,5 +188,6 @@ _Avoid_: Flattened install files
 - "OpenCode default model" is resolved as the top-level `model` or `small_model` fields in `~/.config/opencode/opencode.json`, not provider model discovery.
 - "Claude renderer" is resolved as **Session renderer** once the formatting logic is shared by Codex and OpenCode.
 - "root files" is resolved as the legacy layout where Provider CLIs lived at the repository root; the resolved **Source layout** no longer keeps root Provider CLI files.
-- "preview messages" is resolved as **Session preview** backed by a lazily-loaded **Session transcript**, not the already-loaded session summary.
-- "complete conversation messages" is resolved as complete user messages inside the **Session transcript**, not assistant replies.
+- "preview messages" is resolved as **Session preview** backed by a lazily-loaded **Conversation transcript**, not the already-loaded session summary.
+- "complete conversation messages" is resolved as useful user and assistant dialogue messages inside the **Conversation transcript**, not tool calls or internal events.
+- "Session transcript" formerly meant a user-only preview transcript; resolved as **Conversation transcript** when discussing preview contents.

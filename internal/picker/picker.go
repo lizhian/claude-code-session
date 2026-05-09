@@ -61,6 +61,7 @@ type Model struct {
 	previewTranscript []provider.TranscriptMessage
 	previewError      string
 	previewScroll     int
+	previewAutoBottom bool
 
 	// Terminal dimensions.
 	width  int
@@ -196,11 +197,13 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	switch msg.Type {
 	case tea.MouseWheelUp:
+		m.previewAutoBottom = false
 		m.previewScroll -= scrollLinesPerWheel()
 		if m.previewScroll < 0 {
 			m.previewScroll = 0
 		}
 	case tea.MouseWheelDown:
+		m.previewAutoBottom = false
 		m.previewScroll += scrollLinesPerWheel()
 	}
 	return m, nil
@@ -213,6 +216,7 @@ func (m Model) handleEscape() (tea.Model, tea.Cmd) {
 		m.previewTranscript = nil
 		m.previewError = ""
 		m.previewScroll = 0
+		m.previewAutoBottom = false
 		return m, nil
 	case ViewConfigurationSubitems:
 		return m.cancelConfigurationSubitems()
@@ -265,6 +269,7 @@ func (m Model) handleSpace() (tea.Model, tea.Cmd) {
 			m.previewTranscript = m.provider.LoadSessionTranscript(*items[idx].Session, provider.Context{Cwd: m.cwd})
 			m.previewError = ""
 			m.previewScroll = 0
+			m.previewAutoBottom = true
 			m.view = ViewPreview
 		}
 		return m, nil
@@ -273,6 +278,7 @@ func (m Model) handleSpace() (tea.Model, tea.Cmd) {
 		m.previewTranscript = nil
 		m.previewError = ""
 		m.previewScroll = 0
+		m.previewAutoBottom = false
 		return m, nil
 	case ViewConfigurationSubitems:
 		idx := render.ClampSelectedIndex(m.configItemSelectedIndex, len(m.configSubitems))
@@ -308,6 +314,7 @@ func (m Model) handleUp() (tea.Model, tea.Cmd) {
 		_ = items // ensure computed
 		return m, nil
 	case ViewPreview:
+		m.previewAutoBottom = false
 		if m.previewScroll > 0 {
 			m.previewScroll--
 		}
@@ -338,6 +345,7 @@ func (m Model) handleDown() (tea.Model, tea.Cmd) {
 		m.sessionSelectedIndex = render.ClampSelectedIndex(m.sessionSelectedIndex+1, len(items))
 		return m, nil
 	case ViewPreview:
+		m.previewAutoBottom = false
 		m.previewScroll++
 		return m, nil
 	case ViewWorkspaces:
@@ -795,6 +803,7 @@ func (m Model) renderPreview() string {
 	}
 
 	var bodyLines []string
+	lastMessageStart := 0
 	if m.previewError != "" {
 		bodyLines = append(bodyLines, "")
 		bodyLines = append(bodyLines, render.FitLine("Failed to load transcript:", m.width))
@@ -803,29 +812,57 @@ func (m Model) renderPreview() string {
 		}
 	} else if len(m.previewTranscript) > 0 {
 		bodyLines = append(bodyLines, "")
-		bodyLines = append(bodyLines, render.FitLine(fmt.Sprintf("Transcript: %d user messages", len(m.previewTranscript)), m.width))
+		bodyLines = append(bodyLines, render.FitLine(fmt.Sprintf("Transcript: %d conversation messages", previewMessageCount(m.previewTranscript)), m.width))
 		for i, msg := range m.previewTranscript {
 			bodyLines = append(bodyLines, "")
+			if msg.Role == "omitted" {
+				bodyLines = append(bodyLines, render.Colorize(render.FitLine(msg.Text, m.width), render.ANSIPreviewMuted, m.useColor))
+				continue
+			}
+			lastMessageStart = len(bodyLines) - 1
 			ordinal := msg.Ordinal
 			if ordinal <= 0 {
 				ordinal = i + 1
 			}
+			role := strings.ToLower(msg.Role)
+			color := render.ANSIPreviewMeta
+			if role == "assistant" {
+				color = render.ANSIPreviewMuted
+			}
 			header := render.Colorize(
-				fmt.Sprintf("#%d %s", ordinal, render.FormatSessionTime(msg.Timestamp, now)),
-				render.ANSIPreviewMeta,
+				fmt.Sprintf("#%d %s %s", ordinal, role, render.FormatSessionTime(msg.Timestamp, now)),
+				color,
 				m.useColor,
 			)
 			bodyLines = append(bodyLines, render.FitLine(header, m.width))
 			for _, line := range render.WrapTextPreserveNewlines(msg.Text, m.width) {
-				bodyLines = append(bodyLines, render.FitLine(line, m.width))
+				fitted := render.FitLine(line, m.width)
+				if role == "assistant" {
+					fitted = render.Colorize(fitted, render.ANSIPreviewMuted, m.useColor)
+				}
+				bodyLines = append(bodyLines, fitted)
 			}
 		}
 	}
 
 	bodyHeight := max(1, m.height-len(headerLines))
-	scroll := min(m.previewScroll, max(0, len(bodyLines)-bodyHeight))
+	maxScroll := max(0, len(bodyLines)-bodyHeight)
+	scroll := min(m.previewScroll, maxScroll)
+	if m.previewAutoBottom {
+		scroll = min(lastMessageStart, maxScroll)
+	}
 	visibleBody := bodyLines[scroll:min(scroll+bodyHeight, len(bodyLines))]
 	return strings.Join(append(headerLines, visibleBody...), "\n")
+}
+
+func previewMessageCount(messages []provider.TranscriptMessage) int {
+	count := 0
+	for _, msg := range messages {
+		if msg.Role != "omitted" {
+			count++
+		}
+	}
+	return count
 }
 
 func (m Model) renderWorkspaces() string {

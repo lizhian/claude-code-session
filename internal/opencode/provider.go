@@ -36,7 +36,17 @@ func (p *OpenCodeProvider) ListWorkspaces(ctx provider.Context) []provider.Works
 
 func (p *OpenCodeProvider) LoadSessionTranscript(s provider.Session, ctx provider.Context) []provider.TranscriptMessage {
 	messages, _ := loadSessionTranscript(s)
-	return messages
+	result := session.NormalizeTranscriptMessages(messages, 0, 0)
+	transcript := make([]provider.TranscriptMessage, len(result.Messages))
+	for i, m := range result.Messages {
+		transcript[i] = provider.TranscriptMessage{
+			Role:      m.Role,
+			Timestamp: m.Timestamp,
+			Text:      m.Text,
+			Ordinal:   m.Ordinal,
+		}
+	}
+	return transcript
 }
 
 func (p *OpenCodeProvider) SelectedItemToCommand(item provider.PickItem, permissionMode string, cwd string) provider.CommandSpec {
