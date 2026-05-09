@@ -3,6 +3,7 @@ package picker
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -171,17 +172,36 @@ func (m Model) Result() *provider.PickResult {
 
 // --- Key handlers ---
 
+func scrollLinesPerWheel() int {
+	value := strings.TrimSpace(os.Getenv("AGENT_SESSION_SCROLL_LINES"))
+	if value == "" {
+		return 3
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return 3
+	}
+	if n < 1 {
+		return 1
+	}
+	if n > 20 {
+		return 20
+	}
+	return n
+}
+
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.view != ViewPreview {
 		return m, nil
 	}
 	switch msg.Type {
 	case tea.MouseWheelUp:
-		if m.previewScroll > 0 {
-			m.previewScroll--
+		m.previewScroll -= scrollLinesPerWheel()
+		if m.previewScroll < 0 {
+			m.previewScroll = 0
 		}
 	case tea.MouseWheelDown:
-		m.previewScroll++
+		m.previewScroll += scrollLinesPerWheel()
 	}
 	return m, nil
 }
