@@ -845,13 +845,13 @@ func (m Model) terminalPreviewText(s provider.Session) string {
 	}
 	now := time.Now()
 	lines := []string{
-		render.FitLine(m.provider.Name()+" session preview", width),
-		render.FitLine("Workspace: "+m.cwd, width),
-		render.FitLine("Session: "+s.ID, width),
-		render.FitLine(fmt.Sprintf("Messages: %d", s.MessageCount), width),
-		render.FitLine("Started: "+s.StartedAt, width),
-		render.FitLine("Updated: "+s.UpdatedAt, width),
-		render.FitLine(fmt.Sprintf("Transcript: %d conversation messages", previewMessageCount(m.previewTranscript)), width),
+		render.Colorize(render.FitLine(m.provider.Name()+" session preview", width), render.ANSIPreviewHeader, m.useColor),
+		render.Colorize(render.FitLine("Workspace: "+m.cwd, width), render.ANSIPreviewHeader, m.useColor),
+		render.Colorize(render.FitLine("Session: "+s.ID, width), render.ANSIPreviewHeader, m.useColor),
+		render.Colorize(render.FitLine(fmt.Sprintf("Messages: %d", s.MessageCount), width), render.ANSIPreviewHeader, m.useColor),
+		render.Colorize(render.FitLine("Started: "+s.StartedAt, width), render.ANSIPreviewHeader, m.useColor),
+		render.Colorize(render.FitLine("Updated: "+s.UpdatedAt, width), render.ANSIPreviewHeader, m.useColor),
+		render.Colorize(render.FitLine(fmt.Sprintf("Transcript: %d conversation messages", previewMessageCount(m.previewTranscript)), width), render.ANSIPreviewHeader, m.useColor),
 	}
 	for i, msg := range m.previewTranscript {
 		lines = append(lines, "")
