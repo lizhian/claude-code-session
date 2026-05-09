@@ -146,16 +146,16 @@ _agent_session_run() {
   local cwd_file
   cwd_file="\$(mktemp)" || return
   AGENT_SESSION_CWD_FILE="\$cwd_file" "$BINARY_PATH" "\$cmd" "\$@"
-  local status=\$?
+  local exit_status=\$?
   if [ -s "\$cwd_file" ]; then
     local target_dir
     target_dir="\$(tail -n 1 "\$cwd_file")"
     if [ -n "\$target_dir" ] && [ -d "\$target_dir" ]; then
-      cd "\$target_dir" || status=\$?
+      cd "\$target_dir" || exit_status=\$?
     fi
   fi
   rm -f "\$cwd_file"
-  return \$status
+  return \$exit_status
 }
 cc() { _agent_session_run cc "\$@"; }
 cx() { _agent_session_run cx "\$@"; }
