@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/lizhian/agent-session/internal/claude"
+	"github.com/lizhian/agent-session/internal/codex"
 	"github.com/lizhian/agent-session/internal/picker"
 	"github.com/lizhian/agent-session/internal/provider"
 	"github.com/lizhian/agent-session/internal/render"
@@ -192,7 +193,69 @@ func runClaude(args []string) error {
 }
 
 func runCodex(args []string) error {
-	return fmt.Errorf("Codex provider not yet implemented (Phase 3)")
+	opts, err := codex.ParseArgs(args)
+	if err != nil {
+		return err
+	}
+
+	p := codex.New()
+	cwd := opts["cwd"]
+	home := session.ResolvePath(opts["codexHome"], p.DefaultHome())
+	ctx := provider.Context{Cwd: cwd, DataHome: home, HomeOptionName: p.HomeOptionName()}
+
+	sessions := p.ListSessions(ctx)
+
+	if opts["help"] == "true" {
+		fmt.Print(codexUsage())
+		return nil
+	}
+
+	if opts["trustCurrentFolder"] == "true" && opts["pick"] != "true" && opts["json"] != "true" {
+		if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
+		}
+	}
+
+	if opts["json"] == "true" {
+		payload := codex.JsonPayload(cwd, home, sessions)
+		data, _ := json.MarshalIndent(payload, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	}
+
+	if opts["pick"] == "true" {
+		permissionMode := p.LoadPermissionMode(ctx)
+		if opts["trustCurrentFolder"] == "true" {
+			_ = p.TrustCurrentFolder(cwd, ctx)
+		}
+
+		m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
+		pgm := tea.NewProgram(m, tea.WithAltScreen())
+		resultModel, err := pgm.Run()
+		if err != nil {
+			return err
+		}
+
+		pm := resultModel.(picker.Model)
+		if pm.Result() == nil {
+			os.Exit(130)
+			return nil
+		}
+
+		pickResult := pm.Result()
+		cmd := p.SelectedItemToCommand(pickResult.Item, pickResult.PermissionMode, pickResult.Cwd)
+		if opts["trustCurrentFolder"] == "true" {
+			_ = p.TrustCurrentFolder(pickResult.Cwd, ctx)
+		}
+		return session.RunCommand(cmd.Command, cmd.Args, cmd.Cwd, cmd.Env)
+	}
+
+	for _, line := range codex.SummaryLines(cwd, home, sessions) {
+		fmt.Println(line)
+	}
+	fmt.Println()
+	fmt.Println(render.FormatSessions(sessions, "Codex"))
+	return nil
 }
 
 func runOpenCode(args []string) error {
