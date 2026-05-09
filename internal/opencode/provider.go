@@ -130,20 +130,30 @@ func openCodeProviderModelActions() []provider.ConfigAction {
 	actions := make([]provider.ConfigAction, 0, len(items))
 	for _, item := range items {
 		item := item
+		npm := ""
+		columns := item.Columns
+		if len(item.Columns) > 1 {
+			npm = item.Columns[1].Value
+			columns = item.Columns[:1]
+		}
+		title := "OpenCode models: " + item.Name
+		if npm != "" {
+			title += "  " + npm
+		}
 		actions = append(actions, provider.ConfigAction{
 			Name:                 "Provider " + item.Name,
-			Title:                "OpenCode models: " + item.Name,
+			Title:                title,
 			Mode:                 "multiselect",
 			DirectItem:           &item,
 			EmptySubitemsMessage: "No models.",
 			Columns: func(ctx provider.Context) []provider.ConfigColumn {
-				return item.Columns
+				return columns
 			},
 			LoadSubitems: func(item provider.ConfigItem, ctx provider.Context) ([]provider.ConfigItem, error) {
 				return loadProviderModels(item.Name)
 			},
 			SubitemsTitle: func(item provider.ConfigItem) string {
-				return "OpenCode models: " + item.Name
+				return title
 			},
 			ApplySubitems: func(item provider.ConfigItem, selected []provider.ConfigItem, ctx provider.Context) (string, error) {
 				names := make([]string, len(selected))
