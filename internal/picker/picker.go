@@ -869,7 +869,7 @@ func (m Model) terminalPreviewText(s provider.Session) string {
 			m.useColor,
 		)
 		lines = append(lines, render.FitLine(header, width))
-		for _, line := range render.WrapTextPreserveNewlines(msg.Text, width) {
+		for _, line := range render.WrapTextPreserveNewlines(truncatePreviewMessageText(msg.Text), width) {
 			fitted := render.FitLine(line, width)
 			if role == "assistant" {
 				fitted = render.Colorize(fitted, render.ANSIPreviewMuted, m.useColor)
@@ -932,7 +932,7 @@ func (m Model) renderPreview() string {
 				m.useColor,
 			)
 			bodyLines = append(bodyLines, render.FitLine(header, m.width))
-			for _, line := range render.WrapTextPreserveNewlines(msg.Text, m.width) {
+			for _, line := range render.WrapTextPreserveNewlines(truncatePreviewMessageText(msg.Text), m.width) {
 				fitted := render.FitLine(line, m.width)
 				if role == "assistant" {
 					fitted = render.Colorize(fitted, render.ANSIPreviewMuted, m.useColor)
@@ -960,6 +960,21 @@ func previewMessageCount(messages []provider.TranscriptMessage) int {
 		}
 	}
 	return count
+}
+
+const previewMessageRuneLimit = 300
+const previewMessageEdgeRunes = 150
+
+func truncatePreviewMessageText(text string) string {
+	runes := []rune(text)
+	if len(runes) <= previewMessageRuneLimit {
+		return text
+	}
+	skipped := len(runes) - previewMessageEdgeRunes*2
+	if skipped < 0 {
+		skipped = 0
+	}
+	return string(runes[:previewMessageEdgeRunes]) + "\n\n" + fmt.Sprintf("[%d chars truncated]", skipped) + "\n\n" + string(runes[len(runes)-previewMessageEdgeRunes:])
 }
 
 func (m Model) renderWorkspaces() string {

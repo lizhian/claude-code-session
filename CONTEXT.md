@@ -60,6 +60,10 @@ _Avoid_: All env fields
 Provider-loaded chronological useful dialogue messages for one session, including user messages and assistant replies.
 _Avoid_: Session summary, user-only transcript
 
+**Conversation message preview**:
+A length-limited rendering of one **Conversation transcript** message body.
+_Avoid_: Full message dump
+
 **Source layout**:
 The repository directory structure that separates **Provider CLIs** into provider folders and shared scripts into `common/`.
 _Avoid_: Root CLI files
@@ -90,6 +94,7 @@ _Avoid_: Flattened install files
 - **Provider CLIs** keep provider-specific behavior separate from **Common support modules**.
 - A **Session renderer** may be used by any **Provider CLI**.
 - A **Session preview** belongs to the session picker and loads a **Conversation transcript** lazily.
+- A **Conversation message preview** limits one message body to 300 Unicode runes by keeping the first 150 and last 150 runes.
 - A **Configurations page** is reached from a workspace list and belongs to the current **Agent provider**.
 - A **Multi-select configuration list** uses blue for selected choices and cyan only for the current unselected cursor row.
 - **Provider CLIs** own **Conversation transcript** loading because session storage differs by **Agent provider**.
@@ -173,6 +178,9 @@ _Avoid_: Flattened install files
 
 > **Dev:** "Should the **Session preview** show assistant replies too?"
 > **Domain expert:** "Yes. A **Conversation transcript** includes useful user messages and assistant replies, while excluding tool noise and internal events."
+
+> **Dev:** "If one assistant reply is very long, does the **Session preview** print it in full?"
+> **Domain expert:** "No. It uses a **Conversation message preview** that keeps the first 150 and last 150 Unicode runes, with a body-colored truncation marker between them."
 
 ## Flagged ambiguities
 
