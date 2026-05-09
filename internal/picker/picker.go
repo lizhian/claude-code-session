@@ -467,9 +467,6 @@ func (m Model) selectConfigurationItem() (tea.Model, tea.Cmd) {
 			m.configSubitems = nil
 			m.configStatus = err.Error()
 		} else {
-			for i := range subitems {
-				subitems[i].Selected = false
-			}
 			m.configSubitems = subitems
 			m.configStatus = ""
 		}
