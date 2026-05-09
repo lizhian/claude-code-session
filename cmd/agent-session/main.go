@@ -12,6 +12,7 @@ import (
 
 	"github.com/lizhian/agent-session/internal/claude"
 	"github.com/lizhian/agent-session/internal/codex"
+	"github.com/lizhian/agent-session/internal/opencode"
 	"github.com/lizhian/agent-session/internal/picker"
 	"github.com/lizhian/agent-session/internal/provider"
 	"github.com/lizhian/agent-session/internal/render"
@@ -259,7 +260,60 @@ func runCodex(args []string) error {
 }
 
 func runOpenCode(args []string) error {
-	return fmt.Errorf("OpenCode provider not yet implemented (Phase 4)")
+	opts, err := opencode.ParseArgs(args)
+	if err != nil {
+		return err
+	}
+
+	p := opencode.New()
+	cwd := opts["cwd"]
+	home := session.ResolvePath(opts["opencodeDataHome"], p.DefaultHome())
+	ctx := provider.Context{Cwd: cwd, DataHome: home, HomeOptionName: p.HomeOptionName()}
+
+	sessions := p.ListSessions(ctx)
+
+	if opts["help"] == "true" {
+		fmt.Print(opencodeUsage())
+		return nil
+	}
+
+	if opts["json"] == "true" {
+		payload := opencode.JsonPayload(cwd, home, sessions)
+		data, _ := json.MarshalIndent(payload, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	}
+
+	if opts["pick"] == "true" {
+		permissionMode := p.LoadPermissionMode(ctx)
+		if opts["trustCurrentFolder"] == "true" {
+			_ = p.TrustCurrentFolder(cwd, ctx)
+		}
+
+		m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
+		pgm := tea.NewProgram(m, tea.WithAltScreen())
+		resultModel, err := pgm.Run()
+		if err != nil {
+			return err
+		}
+
+		pm := resultModel.(picker.Model)
+		if pm.Result() == nil {
+			os.Exit(130)
+			return nil
+		}
+
+		pickResult := pm.Result()
+		cmd := p.SelectedItemToCommand(pickResult.Item, pickResult.PermissionMode, pickResult.Cwd)
+		return session.RunCommand(cmd.Command, cmd.Args, cmd.Cwd, cmd.Env)
+	}
+
+	for _, line := range opencode.SummaryLines(cwd, home, sessions) {
+		fmt.Println(line)
+	}
+	fmt.Println()
+	fmt.Println(render.FormatSessions(sessions, "OpenCode"))
+	return nil
 }
 
 func claudeUsage() string {
