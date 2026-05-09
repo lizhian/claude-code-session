@@ -172,10 +172,7 @@ func (m Model) handleEscape() (tea.Model, tea.Cmd) {
 		m.previewError = ""
 		return m, nil
 	case ViewConfigurationSubitems:
-		m.view = ViewConfigurationItems
-		m.activeItem = nil
-		m.configSubitems = nil
-		return m, nil
+		return m.cancelConfigurationSubitems()
 	case ViewConfigurationItems:
 		m.view = ViewConfigurations
 		m.activeAction = nil
@@ -323,11 +320,20 @@ func (m Model) handleLeft() (tea.Model, tea.Cmd) {
 		m.configSubitems = nil
 		return m, nil
 	case ViewConfigurationSubitems:
-		m.view = ViewConfigurationItems
-		m.activeItem = nil
-		m.configSubitems = nil
+		return m.cancelConfigurationSubitems()
+	}
+	return m, nil
+}
+
+func (m Model) cancelConfigurationSubitems() (tea.Model, tea.Cmd) {
+	m.activeItem = nil
+	m.configSubitems = nil
+	if m.activeAction != nil && m.activeAction.DirectItem != nil {
+		m.view = ViewConfigurations
+		m.activeAction = nil
 		return m, nil
 	}
+	m.view = ViewConfigurationItems
 	return m, nil
 }
 
@@ -445,10 +451,18 @@ func (m Model) selectConfiguration() (tea.Model, tea.Cmd) {
 		if err != nil {
 			m.configSubitems = nil
 			m.configStatus = err.Error()
-		} else {
-			m.configSubitems = subitems
-			m.configStatus = ""
+			return m, nil
 		}
+		if len(subitems) == 0 {
+			m.configSubitems = nil
+			m.configStatus = action.EmptySubitemsMessage
+			if m.configStatus == "" {
+				m.configStatus = "No models."
+			}
+			return m, nil
+		}
+		m.configSubitems = subitems
+		m.configStatus = ""
 		m.view = ViewConfigurationSubitems
 		return m, nil
 	}
@@ -487,10 +501,18 @@ func (m Model) selectConfigurationItem() (tea.Model, tea.Cmd) {
 		if err != nil {
 			m.configSubitems = nil
 			m.configStatus = err.Error()
-		} else {
-			m.configSubitems = subitems
-			m.configStatus = ""
+			return m, nil
 		}
+		if len(subitems) == 0 {
+			m.configSubitems = nil
+			m.configStatus = m.activeAction.EmptySubitemsMessage
+			if m.configStatus == "" {
+				m.configStatus = "No models."
+			}
+			return m, nil
+		}
+		m.configSubitems = subitems
+		m.configStatus = ""
 		m.view = ViewConfigurationSubitems
 		return m, nil
 	}
