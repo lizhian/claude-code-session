@@ -100,12 +100,18 @@ func (p *CodexProvider) ConfigurationActions() []provider.ConfigAction {
 				return loadModelProviderItems(ctx.DataHome)
 			},
 			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
-				same, err := selectModelProvider(item.Name, ctx.DataHome)
+				result, err := selectModelProvider(item.Name, ctx.DataHome)
 				if err != nil {
 					return "", err
 				}
-				if same {
+				if result.sameProvider {
 					return "Updated model provider auth: " + item.Name, nil
+				}
+				if result.synced {
+					return "Selected model provider: " + item.Name + "; synced Codex threads", nil
+				}
+				if result.syncError != "" {
+					return "Selected model provider: " + item.Name + "; codex-threadripper sync failed: " + result.syncError, nil
 				}
 				return "Selected model provider: " + item.Name, nil
 			},
@@ -203,12 +209,20 @@ func loadModelProviderItems(codexHome string) ([]provider.ConfigItem, error) {
 	return items, nil
 }
 
-// selectModelProvider selects a model provider in the Codex config.
-func selectModelProvider(providerName, codexHome string) (bool, error) {
+// syncStatus is returned by selectModelProvider when a thread sync was attempted.
+type syncStatus struct {
+	sameProvider bool
+	synced       bool
+	syncError    string
+}
+
+// selectModelProvider selects a model provider in the Codex config
+// and attempts to sync threads via codex-threadripper if the provider changed.
+func selectModelProvider(providerName, codexHome string) (syncStatus, error) {
 	configPath := codexConfigPath(codexHome)
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return false, fmt.Errorf("missing config file: %s", configPath)
+		return syncStatus{}, fmt.Errorf("missing config file: %s", configPath)
 	}
 	text := string(data)
 	_, _, currentSelected := parseTomlProviders(text)
@@ -216,7 +230,17 @@ func selectModelProvider(providerName, codexHome string) (bool, error) {
 
 	updated := setTopLevelStringField(text, "model_provider_selected", providerName)
 	if err := writeConfigText(configPath, updated); err != nil {
-		return false, err
+		return syncStatus{}, err
 	}
-	return sameProvider, nil
+
+	status := syncStatus{sameProvider: sameProvider}
+
+	// If switched to a different provider, try to sync threads.
+	if !sameProvider {
+		syncResult := syncCodexThreads(providerName, codexHome, "")
+		status.synced = syncResult.Synced
+		status.syncError = syncResult.Error
+	}
+
+	return status, nil
 }

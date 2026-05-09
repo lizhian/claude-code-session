@@ -76,7 +76,7 @@ func NewModel(p provider.Provider, sessions []provider.Session, cwd, permissionM
 		provider:       p,
 		sessions:       sessions,
 		view:           ViewSessions,
-		sessionSelectedIndex: 0,
+		sessionSelectedIndex: 1,
 		permissionMode: session.NormalizePermissionMode(permissionMode, p.PermissionModes()),
 		cwd:            cwd,
 		width:          width,
