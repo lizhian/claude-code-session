@@ -61,6 +61,7 @@ On Windows, restart PowerShell or run:
 ```
 
 ## Usage
+For Claude Code sessions:
 
 ```bash
 cc
