@@ -47,6 +47,7 @@ func (p *ClaudeProvider) LoadSessionTranscript(s provider.Session, ctx provider.
 			Role:      m.Role,
 			Timestamp: m.Timestamp,
 			Text:      m.Text,
+			Ordinal:   m.Ordinal,
 		}
 	}
 	return transcript
@@ -141,7 +142,7 @@ func (p *ClaudeProvider) ConfigurationActions() []provider.ConfigAction {
 						Name:     e.Name,
 						Label:    e.Label,
 						Selected: e.Selected,
-						Columns: []provider.ConfigColumn{{Name: "url", Value: url}},
+						Columns:  []provider.ConfigColumn{{Name: "url", Value: url}},
 					}
 				}
 				return items, nil
@@ -176,7 +177,7 @@ func (p *ClaudeProvider) WorkspaceCwd(workspace provider.Workspace, currentCwd s
 // ParseArgs parses CLI arguments for the Claude provider.
 func ParseArgs(args []string) (map[string]string, error) {
 	opts := map[string]string{
-		"cwd":       ".",
+		"cwd":        ".",
 		"claudeHome": defaultClaudeHome(),
 	}
 

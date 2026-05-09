@@ -20,8 +20,8 @@ func (p *CodexProvider) ConfigPath() string {
 	return filepath.Join(session.HomeDir(), ".agent-session", "codex.json")
 }
 
-func (p *CodexProvider) DefaultHome() string { return defaultCodexHome() }
-func (p *CodexProvider) HomeOptionName() string { return "codexHome" }
+func (p *CodexProvider) DefaultHome() string       { return defaultCodexHome() }
+func (p *CodexProvider) HomeOptionName() string    { return "codexHome" }
 func (p *CodexProvider) PermissionModes() []string { return session.DefaultPermissionModes }
 
 func (p *CodexProvider) ListSessions(ctx provider.Context) []provider.Session {
@@ -43,6 +43,7 @@ func (p *CodexProvider) LoadSessionTranscript(s provider.Session, ctx provider.C
 			Role:      m.Role,
 			Timestamp: m.Timestamp,
 			Text:      m.Text,
+			Ordinal:   m.Ordinal,
 		}
 	}
 	return transcript
@@ -93,8 +94,8 @@ func (p *CodexProvider) ConfigurationTitle() string { return "Codex configuratio
 func (p *CodexProvider) ConfigurationActions() []provider.ConfigAction {
 	return []provider.ConfigAction{
 		{
-			Name:         "Model provider",
-			Title:        "Codex model providers",
+			Name:  "Model provider",
+			Title: "Codex model providers",
 			Columns: func(ctx provider.Context) []provider.ConfigColumn {
 				name := currentCodexProviderColumn(ctx.DataHome)
 				return []provider.ConfigColumn{{Name: "provider", Value: name}}
@@ -133,7 +134,7 @@ func (p *CodexProvider) WorkspaceCwd(workspace provider.Workspace, currentCwd st
 // ParseArgs parses CLI arguments for the Codex provider.
 func ParseArgs(args []string) (map[string]string, error) {
 	opts := map[string]string{
-		"cwd":      ".",
+		"cwd":       ".",
 		"codexHome": defaultCodexHome(),
 	}
 

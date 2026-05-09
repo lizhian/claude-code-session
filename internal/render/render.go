@@ -12,12 +12,12 @@ import (
 
 // ANSI escape codes for colored output.
 var (
-	ANSIReset         = "\x1b[0m"
-	ANSIPermDefault   = "\x1b[32m"
-	ANSIPermAuto      = "\x1b[34m"
-	ANSIPermFull      = "\x1b[31m"
-	ANSIPreviewMeta   = "\x1b[36m"
-	ANSISelected      = "\x1b[36m"
+	ANSIReset          = "\x1b[0m"
+	ANSIPermDefault    = "\x1b[32m"
+	ANSIPermAuto       = "\x1b[34m"
+	ANSIPermFull       = "\x1b[31m"
+	ANSIPreviewMeta    = "\x1b[36m"
+	ANSISelected       = "\x1b[36m"
 	ANSISelectedConfig = "\x1b[34m"
 )
 
@@ -402,8 +402,29 @@ func FormatSessions(sessions []provider.Session, providerName string) string {
 // WrapText wraps text to fit within the given display width.
 func WrapText(value string, width int) []string {
 	text := replaceWhitespace(strings.TrimSpace(value))
-	if text == "" {
+	return wrapSingleLine(text, width)
+}
+
+// WrapTextPreserveNewlines wraps text while preserving explicit line breaks.
+func WrapTextPreserveNewlines(value string, width int) []string {
+	text := strings.TrimRight(strings.ReplaceAll(value, "\r\n", "\n"), "\n")
+	if strings.TrimSpace(text) == "" {
 		return []string{"-"}
+	}
+	var lines []string
+	for _, part := range strings.Split(text, "\n") {
+		wrapped := wrapSingleLine(strings.TrimRight(part, "\r"), width)
+		lines = append(lines, wrapped...)
+	}
+	if len(lines) == 0 {
+		return []string{"-"}
+	}
+	return lines
+}
+
+func wrapSingleLine(text string, width int) []string {
+	if text == "" {
+		return []string{""}
 	}
 	if width <= 1 {
 		return []string{TruncateToWidth(text, width)}
@@ -427,7 +448,6 @@ func WrapText(value string, width int) []string {
 	if line.Len() > 0 {
 		lines = append(lines, line.String())
 	}
-
 	if len(lines) == 0 {
 		return []string{"-"}
 	}
@@ -454,5 +474,3 @@ func ClampSelectedIndex(selected, itemCount int) int {
 	}
 	return selected
 }
-
-

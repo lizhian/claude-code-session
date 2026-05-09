@@ -59,6 +59,7 @@ type Model struct {
 	// Preview state.
 	previewTranscript []provider.TranscriptMessage
 	previewError      string
+	previewScroll     int
 
 	// Terminal dimensions.
 	width  int
@@ -173,6 +174,7 @@ func (m Model) handleEscape() (tea.Model, tea.Cmd) {
 		m.view = ViewSessions
 		m.previewTranscript = nil
 		m.previewError = ""
+		m.previewScroll = 0
 		return m, nil
 	case ViewConfigurationSubitems:
 		return m.cancelConfigurationSubitems()
@@ -224,6 +226,7 @@ func (m Model) handleSpace() (tea.Model, tea.Cmd) {
 		if idx < len(items) && items[idx].Type == "session" && items[idx].Session != nil {
 			m.previewTranscript = m.provider.LoadSessionTranscript(*items[idx].Session, provider.Context{Cwd: m.cwd})
 			m.previewError = ""
+			m.previewScroll = 0
 			m.view = ViewPreview
 		}
 		return m, nil
@@ -231,6 +234,7 @@ func (m Model) handleSpace() (tea.Model, tea.Cmd) {
 		m.view = ViewSessions
 		m.previewTranscript = nil
 		m.previewError = ""
+		m.previewScroll = 0
 		return m, nil
 	case ViewConfigurationSubitems:
 		idx := render.ClampSelectedIndex(m.configItemSelectedIndex, len(m.configSubitems))
@@ -265,6 +269,11 @@ func (m Model) handleUp() (tea.Model, tea.Cmd) {
 		}
 		_ = items // ensure computed
 		return m, nil
+	case ViewPreview:
+		if m.previewScroll > 0 {
+			m.previewScroll--
+		}
+		return m, nil
 	case ViewWorkspaces:
 		if m.workspaceSelectedIndex > 0 {
 			m.workspaceSelectedIndex--
@@ -289,6 +298,9 @@ func (m Model) handleDown() (tea.Model, tea.Cmd) {
 	case ViewSessions:
 		items := m.currentSessionItems()
 		m.sessionSelectedIndex = render.ClampSelectedIndex(m.sessionSelectedIndex+1, len(items))
+		return m, nil
+	case ViewPreview:
+		m.previewScroll++
 		return m, nil
 	case ViewWorkspaces:
 		items := m.currentWorkspaceItems()
@@ -736,7 +748,7 @@ func (m Model) renderPreview() string {
 	s := items[idx].Session
 	title := m.provider.Name() + " sessions  " + s.ID
 
-	lines := []string{
+	headerLines := []string{
 		render.FitLine(title, m.width),
 		render.FitLine("Workspace: "+m.cwd, m.width),
 		render.FitLine(render.PickerStatusLine(m.permissionMode, len(items)-1, m.sessionQuery, m.useColor), m.width),
@@ -744,30 +756,38 @@ func (m Model) renderPreview() string {
 		render.FitLine(fmt.Sprintf("Messages: %d  Started: %s  Updated: %s", s.MessageCount, s.StartedAt, s.UpdatedAt), m.width),
 	}
 
+	var bodyLines []string
 	if m.previewError != "" {
-		lines = append(lines, "")
-		lines = append(lines, render.FitLine("Failed to load transcript:", m.width))
-		for _, line := range render.WrapText(m.previewError, m.width) {
-			lines = append(lines, render.FitLine(line, m.width))
+		bodyLines = append(bodyLines, "")
+		bodyLines = append(bodyLines, render.FitLine("Failed to load transcript:", m.width))
+		for _, line := range render.WrapTextPreserveNewlines(m.previewError, m.width) {
+			bodyLines = append(bodyLines, render.FitLine(line, m.width))
 		}
 	} else if len(m.previewTranscript) > 0 {
-		lines = append(lines, "")
-		lines = append(lines, render.FitLine(fmt.Sprintf("Transcript: %d user messages", len(m.previewTranscript)), m.width))
-		for _, msg := range m.previewTranscript {
-			lines = append(lines, "")
+		bodyLines = append(bodyLines, "")
+		bodyLines = append(bodyLines, render.FitLine(fmt.Sprintf("Transcript: %d user messages", len(m.previewTranscript)), m.width))
+		for i, msg := range m.previewTranscript {
+			bodyLines = append(bodyLines, "")
+			ordinal := msg.Ordinal
+			if ordinal <= 0 {
+				ordinal = i + 1
+			}
 			header := render.Colorize(
-				fmt.Sprintf("#%d %s", msg.Ordinal, render.FormatSessionTime(msg.Timestamp, now)),
+				fmt.Sprintf("#%d %s", ordinal, render.FormatSessionTime(msg.Timestamp, now)),
 				render.ANSIPreviewMeta,
 				m.useColor,
 			)
-			lines = append(lines, render.FitLine(header, m.width))
-			for _, line := range render.WrapText(msg.Text, m.width) {
-				lines = append(lines, render.FitLine(line, m.width))
+			bodyLines = append(bodyLines, render.FitLine(header, m.width))
+			for _, line := range render.WrapTextPreserveNewlines(msg.Text, m.width) {
+				bodyLines = append(bodyLines, render.FitLine(line, m.width))
 			}
 		}
 	}
 
-	return strings.Join(lines, "\n")
+	bodyHeight := max(1, m.height-len(headerLines))
+	scroll := min(m.previewScroll, max(0, len(bodyLines)-bodyHeight))
+	visibleBody := bodyLines[scroll:min(scroll+bodyHeight, len(bodyLines))]
+	return strings.Join(append(headerLines, visibleBody...), "\n")
 }
 
 func (m Model) renderWorkspaces() string {
