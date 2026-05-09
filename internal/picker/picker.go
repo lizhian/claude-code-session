@@ -101,6 +101,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -167,6 +170,21 @@ func (m Model) Result() *provider.PickResult {
 }
 
 // --- Key handlers ---
+
+func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.view != ViewPreview {
+		return m, nil
+	}
+	switch msg.Type {
+	case tea.MouseWheelUp:
+		if m.previewScroll > 0 {
+			m.previewScroll--
+		}
+	case tea.MouseWheelDown:
+		m.previewScroll++
+	}
+	return m, nil
+}
 
 func (m Model) handleEscape() (tea.Model, tea.Cmd) {
 	switch m.view {

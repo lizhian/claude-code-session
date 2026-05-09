@@ -135,7 +135,7 @@ func runClaude(args []string) error {
 	// Interactive picker.
 	permissionMode := p.LoadPermissionMode(ctx)
 	m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
-	pgm := tea.NewProgram(m, tea.WithAltScreen())
+	pgm := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	resultModel, err := pgm.Run()
 	if err != nil {
 		return err
@@ -178,7 +178,7 @@ func runCodex(args []string) error {
 	// Interactive picker.
 	permissionMode := p.LoadPermissionMode(ctx)
 	m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
-	pgm := tea.NewProgram(m, tea.WithAltScreen())
+	pgm := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	resultModel, err := pgm.Run()
 	if err != nil {
 		return err
@@ -217,7 +217,7 @@ func runOpenCode(args []string) error {
 	// Interactive picker.
 	permissionMode := p.LoadPermissionMode(ctx)
 	m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
-	pgm := tea.NewProgram(m, tea.WithAltScreen())
+	pgm := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	resultModel, err := pgm.Run()
 	if err != nil {
 		return err
@@ -269,4 +269,3 @@ Options:
   -h, --help                   Show help
 `
 }
-
