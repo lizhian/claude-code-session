@@ -80,31 +80,34 @@ fi
 # --- Download ---
 info "Downloading agent-session (${SUFFIX})..."
 mkdir -p "$INSTALL_DIR"
+TMP_BINARY="$(mktemp "${INSTALL_DIR}/agent-session.XXXXXX")"
 
-HTTP_CODE=$(curl -fsSL -w "%{http_code}" -o "$BINARY_PATH" "$RELEASE_URL") || true
+HTTP_CODE=$(curl -fsSL -w "%{http_code}" -o "$TMP_BINARY" "$RELEASE_URL") || true
 
 if [[ "$HTTP_CODE" != "200" ]]; then
-  rm -f "$BINARY_PATH"
+  rm -f "$TMP_BINARY"
   fail "Failed to download from $RELEASE_URL (HTTP $HTTP_CODE). Check that the release exists."
 fi
 
-chmod 755 "$BINARY_PATH"
-info "Installed agent-session to $BINARY_PATH"
+chmod 755 "$TMP_BINARY"
 
 # --- Verify checksum ---
 CHECKSUM_FILE="$(mktemp)"
 if curl -fsSL -o "$CHECKSUM_FILE" "$CHECKSUM_URL" 2>/dev/null; then
   EXPECTED="$(grep "agent-session-${SUFFIX}$" "$CHECKSUM_FILE" | awk '{print $1}')"
   if [[ -n "$EXPECTED" ]]; then
-    ACTUAL="$(shasum -a 256 "$BINARY_PATH" | awk '{print $1}')"
+    ACTUAL="$(shasum -a 256 "$TMP_BINARY" | awk '{print $1}')"
     if [[ "$ACTUAL" != "$EXPECTED" ]]; then
-      rm -f "$BINARY_PATH"
+      rm -f "$TMP_BINARY"
       fail "Checksum mismatch: expected $EXPECTED, got $ACTUAL"
     fi
     info "Checksum verified."
   fi
 fi
 rm -f "$CHECKSUM_FILE"
+
+mv -f "$TMP_BINARY" "$BINARY_PATH"
+info "Installed agent-session to $BINARY_PATH"
 
 # --- Create symlinks ---
 ln -sf "$BINARY_PATH" "$INSTALL_DIR/cc"
