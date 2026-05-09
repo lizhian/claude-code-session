@@ -475,11 +475,21 @@ func (m Model) selectConfiguration() (tea.Model, tea.Cmd) {
 			m.configStatus = err.Error()
 		} else {
 			m.configItems = items
+			m.configItemSelectedIndex = selectedConfigItemIndex(items)
 			m.configStatus = ""
 		}
 	}
 	m.view = ViewConfigurationItems
 	return m, nil
+}
+
+func selectedConfigItemIndex(items []provider.ConfigItem) int {
+	for i, item := range items {
+		if item.Selected {
+			return i
+		}
+	}
+	return 0
 }
 
 func (m Model) selectConfigurationItem() (tea.Model, tea.Cmd) {
