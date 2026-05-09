@@ -17,7 +17,12 @@ const {
   pickAndRunCodex,
   renderInteractivePicker,
   renderWorkspacePicker,
+  syncCodexThreads,
 } = require("./codex/codex-sessions");
+
+function nextTick() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
 
 function writeCodexSession(file, options) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -46,6 +51,45 @@ function writeCodexSession(file, options) {
       }),
     ].join("\n"),
   );
+}
+
+function writeCodexProviderConfig(codexHome, selectedProviderName = "openai") {
+  fs.mkdirSync(codexHome, { recursive: true });
+  fs.writeFileSync(
+    path.join(codexHome, "config.toml"),
+    [
+      "model = \"gpt-5\"",
+      `model_provider_selected = ${JSON.stringify(selectedProviderName)}`,
+      "",
+      "[model_providers.openai]",
+      "auth_json = '''{\"OPENAI_API_KEY\":\"default-key\"}'''",
+      "",
+      "[model_providers.custom]",
+      "base_url = \"https://api.example.com/v1\"",
+      "auth_json = '''{\"OPENAI_API_KEY\":\"custom-key\"}'''",
+      "",
+    ].join("\n"),
+  );
+  fs.writeFileSync(path.join(codexHome, "auth.json"), `${JSON.stringify({ OPENAI_API_KEY: "fresh-key" })}\n`);
+}
+
+async function openCodexProviderItems(input) {
+  await nextTick();
+  input.emit("keypress", "", { name: "right" });
+  await nextTick();
+  input.emit("keypress", "", { name: "right" });
+  await nextTick();
+  input.emit("keypress", "", { name: "return" });
+  await nextTick();
+}
+
+async function finishPicker(input, picker) {
+  input.emit("keypress", "", { name: "escape" });
+  await nextTick();
+  input.emit("keypress", "", { name: "return" });
+  await nextTick();
+  input.emit("keypress", "", { name: "return" });
+  await picker;
 }
 
 test("stores default Codex config under the Codex picker install directory", () => {
@@ -230,6 +274,171 @@ test("renders Codex workspace picker title", () => {
   });
 
   assert.match(output, /Codex workspaces/);
+});
+
+test("syncs Codex threads with the selected provider and Codex home", () => {
+  const codexHome = path.join(os.tmpdir(), "codex-threadripper-home");
+  const cwd = path.join(os.tmpdir(), "codex-threadripper-cwd");
+  const calls = [];
+
+  const result = syncCodexThreads("custom", codexHome, {
+    cwd,
+    commandExists: (command) => command === "codex-threadripper",
+    runSync: (command, args, options) => {
+      calls.push({ command, args, options });
+      return { status: 0, stdout: "", stderr: "" };
+    },
+  });
+
+  assert.deepEqual(result, { synced: true });
+  assert.deepEqual(calls, [
+    {
+      command: "codex-threadripper",
+      args: ["--codex-home", codexHome, "--provider", "custom", "sync"],
+      options: {
+        cwd,
+        env: { CODEX_HOME: codexHome },
+      },
+    },
+  ]);
+});
+
+test("skips Codex thread sync when codex-threadripper is not installed", () => {
+  let ran = false;
+
+  const result = syncCodexThreads("custom", "/tmp/codex", {
+    commandExists: () => false,
+    runSync: () => {
+      ran = true;
+      return { status: 0 };
+    },
+  });
+
+  assert.deepEqual(result, { skipped: true, reason: "missing-command" });
+  assert.equal(ran, false);
+});
+
+test("reports Codex thread sync failures with a concise reason", () => {
+  const result = syncCodexThreads("custom", "/tmp/codex", {
+    commandExists: () => true,
+    runSync: () => ({
+      status: 1,
+      stderr: ` ${"sync failed ".repeat(20)}\nsecond line`,
+      stdout: "",
+    }),
+  });
+
+  assert.equal(result.synced, false);
+  assert.match(result.error, /^sync failed sync failed/);
+  assert.ok(result.error.length <= 120);
+  assert.doesNotMatch(result.error, /second line/);
+});
+
+test("Codex provider switch runs codex-threadripper sync once", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-provider-threadripper-"));
+  const codexHome = path.join(tempDir, ".codex");
+  const cwd = path.join(tempDir, "payment-api");
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const calls = [];
+
+  writeCodexSession(path.join(codexHome, "sessions", "2026", "04", "29", "rollout-1.jsonl"), {
+    id: "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4",
+    cwd,
+    startedAt: "2026-04-29T14:56:25.542Z",
+    updatedAt: "2026-04-29T15:00:00.000Z",
+    firstPrompt: "first prompt",
+    lastPrompt: "last prompt",
+  });
+  writeCodexProviderConfig(codexHome, "openai");
+
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+
+  const picker = pickAndRunCodex(listSessions({ cwd, codexHome }), {
+    input,
+    output,
+    cwd,
+    codexHome,
+    configPath: path.join(tempDir, "picker.json"),
+    runCommand: () => {},
+    codexThreadripper: {
+      commandExists: () => true,
+      runSync: (command, args, options) => {
+        calls.push({ command, args, options });
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    },
+  });
+
+  await openCodexProviderItems(input);
+  input.emit("keypress", "", { name: "down" });
+  await nextTick();
+  input.emit("keypress", "", { name: "return" });
+  await nextTick();
+  await finishPicker(input, picker);
+
+  assert.deepEqual(calls, [
+    {
+      command: "codex-threadripper",
+      args: ["--codex-home", codexHome, "--provider", "custom", "sync"],
+      options: {
+        cwd,
+        env: { CODEX_HOME: codexHome },
+      },
+    },
+  ]);
+});
+
+test("Codex provider auth refresh does not run codex-threadripper sync", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-provider-threadripper-same-"));
+  const codexHome = path.join(tempDir, ".codex");
+  const cwd = path.join(tempDir, "payment-api");
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const calls = [];
+
+  writeCodexSession(path.join(codexHome, "sessions", "2026", "04", "29", "rollout-1.jsonl"), {
+    id: "019dd9bd-c3c2-7de0-9c85-adcd2e6b21e4",
+    cwd,
+    startedAt: "2026-04-29T14:56:25.542Z",
+    updatedAt: "2026-04-29T15:00:00.000Z",
+    firstPrompt: "first prompt",
+    lastPrompt: "last prompt",
+  });
+  writeCodexProviderConfig(codexHome, "openai");
+
+  input.isTTY = true;
+  output.isTTY = true;
+  output.rows = 24;
+  output.columns = 100;
+  input.setRawMode = () => {};
+
+  const picker = pickAndRunCodex(listSessions({ cwd, codexHome }), {
+    input,
+    output,
+    cwd,
+    codexHome,
+    configPath: path.join(tempDir, "picker.json"),
+    runCommand: () => {},
+    codexThreadripper: {
+      commandExists: () => true,
+      runSync: (command, args, options) => {
+        calls.push({ command, args, options });
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    },
+  });
+
+  await openCodexProviderItems(input);
+  input.emit("keypress", "", { name: "return" });
+  await nextTick();
+  await finishPicker(input, picker);
+
+  assert.deepEqual(calls, []);
 });
 
 test("Codex configurations show the current model provider", async () => {

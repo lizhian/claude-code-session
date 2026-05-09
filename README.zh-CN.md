@@ -136,6 +136,7 @@ Codex model provider 配置：
 - 切换 provider 前，先把当前 `~/.codex/auth.json` 回写到上一个 provider 的 `auth_json`。
 - 如果找不到上一个 provider，会创建一个 `unknown-YYYYMMDD-HHmmss` provider，并写入 `name` 和 `auth_json`，避免当前 token 丢失。
 - 目标 provider 有 `base_url` 时更新 Codex 原生顶层 `model_provider`；选择没有 `base_url` 的 provider 时删除 `model_provider`。
+- 如果本机安装了 `codex-threadripper`，从 picker 切换到不同 provider 后会执行一次 `codex-threadripper --codex-home <当前 CODEX_HOME> --provider <所选 provider> sync`，让 Codex 会话历史跟随所选 provider。
 
 OpenCode 配置：
 

@@ -132,6 +132,7 @@ Codex model provider configuration:
 - Before switching providers, backs up the current `~/.codex/auth.json` into the previous provider's `auth_json`.
 - If no previous provider is known, creates an `unknown-YYYYMMDD-HHmmss` provider with `name` and `auth_json` so current tokens are not lost.
 - Updates Codex's native top-level `model_provider` only when the target provider has `base_url`; selecting a provider without `base_url` removes `model_provider`.
+- When `codex-threadripper` is installed, switching to a different provider from the picker runs `codex-threadripper --codex-home <active CODEX_HOME> --provider <selected provider> sync` once so Codex thread history follows the selected provider.
 
 OpenCode configuration:
 

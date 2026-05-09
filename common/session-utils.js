@@ -320,6 +320,7 @@ function createSessionPicker({
           cwd: currentCwd,
           dataHome,
           homeOptionName,
+          options: io,
         }) || [];
       }
 
@@ -543,6 +544,7 @@ function createSessionPicker({
                   cwd: currentCwd,
                   dataHome,
                   homeOptionName,
+                  options: io,
                 });
                 configurationSubitems = subitems.map((subitem) => ({ ...subitem, checkable: true }));
                 configurationStatus = "";
@@ -558,6 +560,7 @@ function createSessionPicker({
                 cwd: currentCwd,
                 dataHome,
                 homeOptionName,
+                options: io,
               }) || {};
               configurationStatus = result.status || `Selected ${item.label || item.name || "configuration"}.`;
               view = "configurations";
@@ -582,6 +585,7 @@ function createSessionPicker({
                 cwd: currentCwd,
                 dataHome,
                 homeOptionName,
+                options: io,
               }) || {};
               configurationStatus = result.status || `Selected ${selectedItems.length} configurations.`;
               view = "configurations";

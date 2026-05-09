@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
 const {
   filterSessions,
@@ -274,6 +275,61 @@ function renderConfigurationPicker(options = {}) {
   return renderProviderConfigurationPicker(options);
 }
 
+function firstOutputLine(value) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) || "";
+}
+
+function truncateStatus(value, maxLength = 120) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function commandExists(command) {
+  const result = spawnSync(command, ["--version"], { stdio: "ignore" });
+  return !result.error;
+}
+
+function runCodexThreadripperSync(command, args, options) {
+  return spawnSync(command, args, {
+    cwd: options.cwd || process.cwd(),
+    env: { ...process.env, ...(options.env || {}) },
+    encoding: "utf8",
+  });
+}
+
+function syncCodexThreads(providerName, codexHome = defaultCodexHome(), options = {}) {
+  const command = options.command || "codex-threadripper";
+  const exists = options.commandExists || commandExists;
+  if (!exists(command)) {
+    return { skipped: true, reason: "missing-command" };
+  }
+
+  const dataHome = path.resolve(codexHome);
+  const args = ["--codex-home", dataHome, "--provider", providerName, "sync"];
+  const env = { CODEX_HOME: dataHome };
+  const runSync = options.runSync || runCodexThreadripperSync;
+  const result = runSync(command, args, {
+    cwd: options.cwd || process.cwd(),
+    env,
+  });
+
+  if (result && result.error) {
+    return { synced: false, error: truncateStatus(result.error.message) };
+  }
+  if (!result || result.status !== 0) {
+    const reason = firstOutputLine(result && result.stderr) || firstOutputLine(result && result.stdout) || `exit ${result && result.status}`;
+    return { synced: false, error: truncateStatus(reason) };
+  }
+
+  return { synced: true };
+}
+
 function currentCodexProviderColumn(dataHome) {
   try {
     return [loadModelProviders(dataHome).selectedProviderName || ""];
@@ -389,8 +445,18 @@ const pickSessionInteractive = createSessionPicker({
       title: "Codex model providers",
       columns: ({ dataHome }) => currentCodexProviderColumn(dataHome),
       loadItems: ({ dataHome }) => loadModelProviders(dataHome).providers,
-      applyItem: (item, { dataHome }) => {
+      applyItem: (item, { cwd, dataHome, options }) => {
         const result = selectModelProvider(item.name, dataHome);
+        if (!result.sameProvider) {
+          const syncOptions = { ...((options && options.codexThreadripper) || {}), cwd };
+          const syncResult = syncCodexThreads(item.name, dataHome, syncOptions);
+          if (syncResult.synced) {
+            return { status: `Selected model provider: ${item.name}; synced Codex threads` };
+          }
+          if (syncResult.error) {
+            return { status: `Selected model provider: ${item.name}; codex-threadripper sync failed: ${syncResult.error}` };
+          }
+        }
         return {
           status: result.sameProvider
             ? `Updated model provider auth: ${item.name}`
@@ -535,4 +601,5 @@ module.exports = {
   renderConfigurationPicker,
   renderWorkspacePicker,
   summarizeSession,
+  syncCodexThreads,
 };
