@@ -31,12 +31,12 @@ Commands:
 
 Options:
   --json                       Output JSON for scripting
-  --pick                       Interactive session picker
+  --list                       List sessions as text table
   --trust-current-folder       Mark current directory as trusted
   --cwd <path>                 Project directory (default: current directory)
   -h, --help                   Show help
 
-When invoked as cc, cx, or oc (via symlink), the corresponding provider runs directly.
+When invoked as cc, cx, or oc (via symlink), the interactive picker opens by default.
 `
 
 func main() {
@@ -134,63 +134,64 @@ func runClaude(args []string) error {
 		return nil
 	}
 
-	// --trust-current-folder (non-interactive).
-	if opts["trustCurrentFolder"] == "true" && opts["pick"] != "true" && opts["json"] != "true" {
-		if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
-		}
-	}
-
 	// --json mode.
 	if opts["json"] == "true" {
+		if opts["trustCurrentFolder"] == "true" {
+			if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
+			}
+		}
 		payload := claude.JsonPayload(cwd, home, sessions)
 		data, _ := json.MarshalIndent(payload, "", "  ")
 		fmt.Println(string(data))
 		return nil
 	}
 
-	// --pick mode.
-	if opts["pick"] == "true" {
-		permissionMode := p.LoadPermissionMode(ctx)
-
-		// Trust current folder if requested.
+	// --list mode: text table.
+	if opts["list"] == "true" {
 		if opts["trustCurrentFolder"] == "true" {
 			if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
 			}
 		}
-
-		m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
-		pgm := tea.NewProgram(m, tea.WithAltScreen())
-		resultModel, err := pgm.Run()
-		if err != nil {
-			return err
+		for _, line := range claude.SummaryLines(cwd, home, sessions) {
+			fmt.Println(line)
 		}
-
-		pm := resultModel.(picker.Model)
-		if pm.Result() == nil {
-			os.Exit(130)
-			return nil
-		}
-
-		pickResult := pm.Result()
-		cmd := p.SelectedItemToCommand(pickResult.Item, pickResult.PermissionMode, pickResult.Cwd)
-
-		// Trust current folder after picking.
-		if opts["trustCurrentFolder"] == "true" {
-			_ = p.TrustCurrentFolder(pickResult.Cwd, ctx)
-		}
-
-		return session.RunCommand(cmd.Command, cmd.Args, cmd.Cwd, cmd.Env)
+		fmt.Println()
+		fmt.Println(render.FormatSessions(sessions, "Claude Code"))
+		return nil
 	}
 
-	// Default: summary + session table.
-	for _, line := range claude.SummaryLines(cwd, home, sessions) {
-		fmt.Println(line)
+	// Default: interactive picker.
+	permissionMode := p.LoadPermissionMode(ctx)
+	if opts["trustCurrentFolder"] == "true" {
+		if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
+		}
 	}
-	fmt.Println()
-	fmt.Println(render.FormatSessions(sessions, "Claude Code"))
-	return nil
+
+	m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
+	pgm := tea.NewProgram(m, tea.WithAltScreen())
+	resultModel, err := pgm.Run()
+	if err != nil {
+		return err
+	}
+
+	pm := resultModel.(picker.Model)
+	if pm.Result() == nil {
+		os.Exit(130)
+		return nil
+	}
+
+	pickResult := pm.Result()
+	cmd := p.SelectedItemToCommand(pickResult.Item, pickResult.PermissionMode, pickResult.Cwd)
+
+	// Trust current folder after picking.
+	if opts["trustCurrentFolder"] == "true" {
+		_ = p.TrustCurrentFolder(pickResult.Cwd, ctx)
+	}
+
+	return session.RunCommand(cmd.Command, cmd.Args, cmd.Cwd, cmd.Env)
 }
 
 func runCodex(args []string) error {
@@ -211,52 +212,57 @@ func runCodex(args []string) error {
 		return nil
 	}
 
-	if opts["trustCurrentFolder"] == "true" && opts["pick"] != "true" && opts["json"] != "true" {
-		if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
-		}
-	}
-
 	if opts["json"] == "true" {
+		if opts["trustCurrentFolder"] == "true" {
+			if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
+			}
+		}
 		payload := codex.JsonPayload(cwd, home, sessions)
 		data, _ := json.MarshalIndent(payload, "", "  ")
 		fmt.Println(string(data))
 		return nil
 	}
 
-	if opts["pick"] == "true" {
-		permissionMode := p.LoadPermissionMode(ctx)
+	if opts["list"] == "true" {
 		if opts["trustCurrentFolder"] == "true" {
-			_ = p.TrustCurrentFolder(cwd, ctx)
+			if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
+			}
 		}
-
-		m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
-		pgm := tea.NewProgram(m, tea.WithAltScreen())
-		resultModel, err := pgm.Run()
-		if err != nil {
-			return err
+		for _, line := range codex.SummaryLines(cwd, home, sessions) {
+			fmt.Println(line)
 		}
-
-		pm := resultModel.(picker.Model)
-		if pm.Result() == nil {
-			os.Exit(130)
-			return nil
-		}
-
-		pickResult := pm.Result()
-		cmd := p.SelectedItemToCommand(pickResult.Item, pickResult.PermissionMode, pickResult.Cwd)
-		if opts["trustCurrentFolder"] == "true" {
-			_ = p.TrustCurrentFolder(pickResult.Cwd, ctx)
-		}
-		return session.RunCommand(cmd.Command, cmd.Args, cmd.Cwd, cmd.Env)
+		fmt.Println()
+		fmt.Println(render.FormatSessions(sessions, "Codex"))
+		return nil
 	}
 
-	for _, line := range codex.SummaryLines(cwd, home, sessions) {
-		fmt.Println(line)
+	// Default: interactive picker.
+	permissionMode := p.LoadPermissionMode(ctx)
+	if opts["trustCurrentFolder"] == "true" {
+		_ = p.TrustCurrentFolder(cwd, ctx)
 	}
-	fmt.Println()
-	fmt.Println(render.FormatSessions(sessions, "Codex"))
-	return nil
+
+	m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
+	pgm := tea.NewProgram(m, tea.WithAltScreen())
+	resultModel, err := pgm.Run()
+	if err != nil {
+		return err
+	}
+
+	pm := resultModel.(picker.Model)
+	if pm.Result() == nil {
+		os.Exit(130)
+		return nil
+	}
+
+	pickResult := pm.Result()
+	cmd := p.SelectedItemToCommand(pickResult.Item, pickResult.PermissionMode, pickResult.Cwd)
+	if opts["trustCurrentFolder"] == "true" {
+		_ = p.TrustCurrentFolder(pickResult.Cwd, ctx)
+	}
+	return session.RunCommand(cmd.Command, cmd.Args, cmd.Cwd, cmd.Env)
 }
 
 func runOpenCode(args []string) error {
@@ -284,36 +290,37 @@ func runOpenCode(args []string) error {
 		return nil
 	}
 
-	if opts["pick"] == "true" {
-		permissionMode := p.LoadPermissionMode(ctx)
-		if opts["trustCurrentFolder"] == "true" {
-			_ = p.TrustCurrentFolder(cwd, ctx)
+	if opts["list"] == "true" {
+		for _, line := range opencode.SummaryLines(cwd, home, sessions) {
+			fmt.Println(line)
 		}
-
-		m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
-		pgm := tea.NewProgram(m, tea.WithAltScreen())
-		resultModel, err := pgm.Run()
-		if err != nil {
-			return err
-		}
-
-		pm := resultModel.(picker.Model)
-		if pm.Result() == nil {
-			os.Exit(130)
-			return nil
-		}
-
-		pickResult := pm.Result()
-		cmd := p.SelectedItemToCommand(pickResult.Item, pickResult.PermissionMode, pickResult.Cwd)
-		return session.RunCommand(cmd.Command, cmd.Args, cmd.Cwd, cmd.Env)
+		fmt.Println()
+		fmt.Println(render.FormatSessions(sessions, "OpenCode"))
+		return nil
 	}
 
-	for _, line := range opencode.SummaryLines(cwd, home, sessions) {
-		fmt.Println(line)
+	// Default: interactive picker.
+	permissionMode := p.LoadPermissionMode(ctx)
+	if opts["trustCurrentFolder"] == "true" {
+		_ = p.TrustCurrentFolder(cwd, ctx)
 	}
-	fmt.Println()
-	fmt.Println(render.FormatSessions(sessions, "OpenCode"))
-	return nil
+
+	m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
+	pgm := tea.NewProgram(m, tea.WithAltScreen())
+	resultModel, err := pgm.Run()
+	if err != nil {
+		return err
+	}
+
+	pm := resultModel.(picker.Model)
+	if pm.Result() == nil {
+		os.Exit(130)
+		return nil
+	}
+
+	pickResult := pm.Result()
+	cmd := p.SelectedItemToCommand(pickResult.Item, pickResult.PermissionMode, pickResult.Cwd)
+	return session.RunCommand(cmd.Command, cmd.Args, cmd.Cwd, cmd.Env)
 }
 
 func claudeUsage() string {
@@ -321,9 +328,11 @@ func claudeUsage() string {
 
 Claude Code session picker.
 
+By default opens the interactive picker.
+
 Options:
   --json                       Output JSON for scripting
-  --pick                       Interactive session picker
+  --list                       List sessions as text table
   --trust-current-folder       Mark current directory as trusted
   --cwd <path>                 Project directory (default: current directory)
   --claude-home <path>         Claude config directory (default: ~/.claude or CLAUDE_HOME)
@@ -336,9 +345,11 @@ func codexUsage() string {
 
 Codex session picker.
 
+By default opens the interactive picker.
+
 Options:
   --json                       Output JSON for scripting
-  --pick                       Interactive session picker
+  --list                       List sessions as text table
   --trust-current-folder       Mark current directory as trusted
   --cwd <path>                 Project directory (default: current directory)
   --codex-home <path>          Codex config directory (default: ~/.codex or CODEX_HOME)
@@ -351,9 +362,11 @@ func opencodeUsage() string {
 
 OpenCode session picker.
 
+By default opens the interactive picker.
+
 Options:
   --json                       Output JSON for scripting
-  --pick                       Interactive session picker
+  --list                       List sessions as text table
   --trust-current-folder       Mark current directory as trusted
   --cwd <path>                 Project directory (default: current directory)
   --opencode-data-home <path>  OpenCode data directory (default: ~/.local/share/opencode)
