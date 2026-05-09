@@ -111,11 +111,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case terminalPreviewReadyMsg:
 		if m.view == ViewTerminalPreview {
-			fmt.Print("\x1b[H\x1b[2J")
+			printTerminalText("\x1b[H\x1b[2J")
 			items := m.currentSessionItems()
 			idx := render.ClampSelectedIndex(m.sessionSelectedIndex, len(items))
 			if idx < len(items) && items[idx].Type == "session" && items[idx].Session != nil {
-				fmt.Print(m.terminalPreviewText(*items[idx].Session))
+				printTerminalText(m.terminalPreviewText(*items[idx].Session))
 			}
 		}
 		return m, nil
@@ -241,7 +241,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) closeTerminalPreview() (tea.Model, tea.Cmd) {
-	fmt.Print("\x1b[H\x1b[2J")
+	printTerminalText("\x1b[H\x1b[2J")
 	m.view = ViewSessions
 	m.previewTranscript = nil
 	m.previewError = ""
@@ -829,6 +829,10 @@ func printTerminalPreview() tea.Cmd {
 	return func() tea.Msg {
 		return terminalPreviewReadyMsg{}
 	}
+}
+
+func printTerminalText(text string) {
+	fmt.Print(strings.ReplaceAll(text, "\n", "\r\n"))
 }
 
 func (m Model) terminalPreviewText(s provider.Session) string {
