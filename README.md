@@ -139,7 +139,8 @@ OpenCode configuration:
 - Reads `~/.config/opencode/opencode.json`.
 - Supports JSONC-style input with comments and trailing commas.
 - Writes back standard formatted JSON.
-- Stores the selected permission mode in top-level `permission_mode_selected`.
+- Stores the selected permission mode in OpenCode's native top-level `permission` field: `full` writes `permission: "allow"` and `default` writes `permission: "ask"`.
+- Removes the legacy unsupported `permission_mode_selected` key when reading or saving OpenCode permission mode.
 - `Provider models` lists `@ai-sdk/*` providers with `options.baseURL` and `options.apiKey`, fetches models with `GET {baseURL}/models`, and writes selected model IDs to `provider.<name>.models`.
 - If a provider's own model endpoint returns an empty list, providers with the same origin and API key may be used as a fallback model-list source.
 - `Default model` writes top-level `model` as `provider/model`.
@@ -182,8 +183,8 @@ Options:
 
 - Claude, Codex, and OpenCode keep separate entry files so provider-specific storage and launch flags stay isolated.
 - Shared picker behavior lives in `common/session-utils.js` and `common/session-renderer.js`; provider CLIs reuse it with provider-specific titles.
-- Permission modes are persisted in each provider's native config as `permission_mode_selected`.
-- OpenCode full permission is passed through `OPENCODE_PERMISSION="allow"` because the OpenCode TUI does not support a matching command-line flag.
+- Claude and Codex permission modes are persisted in each provider's native config as `permission_mode_selected`.
+- OpenCode permission mode is persisted in its native `permission` field and full permission is also passed through `OPENCODE_PERMISSION="allow"` for CLI compatibility.
 
 ## Development
 

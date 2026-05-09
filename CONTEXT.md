@@ -130,7 +130,7 @@ _Avoid_: Flattened install files
 > **Domain expert:** "No. First back up the current `auth.json` into the previously selected provider's `auth_json`; only then write the target provider's auth."
 
 > **Dev:** "Should permission mode still be saved under `~/.agent-session`?"
-> **Domain expert:** "No. It is **Permission mode selection state** and belongs in each **Agent provider**'s native config as `permission_mode_selected`."
+> **Domain expert:** "No. It is **Permission mode selection state** and belongs in each **Agent provider**'s native config. Claude and Codex use `permission_mode_selected`; OpenCode must use its native `permission` field because its config schema rejects unknown top-level keys."
 
 > **Dev:** "Is `model_provider_selected` only a Codex concept?"
 > **Domain expert:** "No. It is **Model provider selection state** for any **Agent provider** that supports the field; Codex and Claude Code both use it, while OpenCode currently does not."

@@ -143,7 +143,8 @@ OpenCode 配置：
 - 读取 `~/.config/opencode/opencode.json`。
 - 支持带注释和尾随逗号的 JSONC 风格输入。
 - 写回时格式化为标准 JSON。
-- 使用顶层 `permission_mode_selected` 保存当前选择的权限模式。
+- 使用 OpenCode 原生顶层 `permission` 字段保存当前选择的权限模式：`full` 写入 `permission: "allow"`，`default` 写入 `permission: "ask"`。
+- 读取或保存 OpenCode 权限模式时会移除旧的、不被支持的 `permission_mode_selected` 字段。
 - `Provider models` 会列出带 `options.baseURL` 和 `options.apiKey` 的 `@ai-sdk/*` providers，使用 `GET {baseURL}/models` 拉取模型，并把选中的模型 ID 写入 `provider.<name>.models`。
 - 如果某个 provider 自己的模型接口返回空列表，会尝试使用同 origin、同 API key 的其它 provider 作为模型列表来源。
 - `Default model` 写入顶层 `model`，格式为 `provider/model`。
@@ -186,8 +187,8 @@ node opencode/opencode-sessions.js [--json | --pick] [--cwd <path>] [--opencode-
 
 - Claude、Codex 和 OpenCode 保持独立入口文件，避免不同 provider 的存储格式和启动参数互相影响。
 - 通用 picker 行为放在 `common/session-utils.js` 和 `common/session-renderer.js`；各 provider CLI 复用它们并传入自己的标题。
-- permission mode 按 provider 分别持久化到各自原生配置的 `permission_mode_selected`。
-- OpenCode full permission 通过 `OPENCODE_PERMISSION="allow"` 传入，因为 OpenCode TUI 当前没有对应的命令行 flag。
+- Claude 和 Codex 的 permission mode 持久化到各自原生配置的 `permission_mode_selected`。
+- OpenCode permission mode 持久化到它原生的 `permission` 字段，同时 full permission 也会通过 `OPENCODE_PERMISSION="allow"` 传入以兼容 CLI。
 
 ## 开发
 

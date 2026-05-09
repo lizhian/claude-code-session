@@ -432,7 +432,7 @@ function usage() {
     "",
     "获取指定目录对应的 OpenCode sessions。默认读取当前目录和 ~/.local/share/opencode。",
     "交互模式快捷键：Tab 切换 default/full permission，→ 选择 OpenCode 工作区；在工作区列表中 → 进入 configurations。",
-    "权限模式会自动记住，配置保存在 ~/.config/opencode/opencode.json 的 permission_mode_selected。",
+    "权限模式会自动记住，配置保存在 ~/.config/opencode/opencode.json 的 permission 字段。",
     "",
     "Options:",
     "  --json                       输出 JSON，方便 jq 或其他脚本处理",

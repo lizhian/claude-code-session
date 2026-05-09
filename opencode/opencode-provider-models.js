@@ -213,12 +213,27 @@ function loadOpenCodePermissionMode(configPath = defaultOpenCodeConfigPath()) {
     return "";
   }
   const config = readOpenCodeConfig(configPath);
-  return typeof config.permission_mode_selected === "string" ? config.permission_mode_selected : "";
+  const legacyPermissionMode = typeof config.permission_mode_selected === "string"
+    ? config.permission_mode_selected
+    : "";
+  if (legacyPermissionMode) {
+    delete config.permission_mode_selected;
+    if (!Object.hasOwn(config, "permission")) {
+      config.permission = legacyPermissionMode === "full" ? "allow" : "ask";
+    }
+    writeOpenCodeConfig(config, configPath);
+  }
+  return config.permission === "allow" ? "full" : "";
 }
 
 function saveOpenCodePermissionMode(permissionMode, configPath = defaultOpenCodeConfigPath()) {
   const config = fs.existsSync(configPath) ? readOpenCodeConfig(configPath) : {};
-  config.permission_mode_selected = permissionMode;
+  delete config.permission_mode_selected;
+  if (permissionMode === "full") {
+    config.permission = "allow";
+  } else {
+    config.permission = "ask";
+  }
   writeOpenCodeConfig(config, configPath);
 }
 

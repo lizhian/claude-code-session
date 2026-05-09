@@ -294,10 +294,52 @@ test("stores OpenCode permission mode in opencode.json", () => {
   assert.equal(loadOpenCodePermissionMode(configPath), "");
   saveOpenCodePermissionMode("full", configPath);
 
-  const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-  assert.equal(config.permission_mode_selected, "full");
+  let config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  assert.equal(config.permission, "allow");
+  assert.equal(config.permission_mode_selected, undefined);
   assert.equal(config.model, "provider-a/alpha");
   assert.equal(loadOpenCodePermissionMode(configPath), "full");
+
+  saveOpenCodePermissionMode("default", configPath);
+
+  config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  assert.equal(config.permission, "ask");
+  assert.equal(config.permission_mode_selected, undefined);
+  assert.equal(loadOpenCodePermissionMode(configPath), "");
+});
+
+test("migrates legacy OpenCode picker permission mode to native permission", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-legacy-permission-mode-"));
+  const fullConfigPath = path.join(tempDir, "opencode-full.json");
+  const defaultConfigPath = path.join(tempDir, "opencode-default.json");
+  writeConfig(
+    fullConfigPath,
+    JSON.stringify({
+      model: "provider-a/alpha",
+      permission_mode_selected: "full",
+    }),
+  );
+  writeConfig(
+    defaultConfigPath,
+    JSON.stringify({
+      model: "provider-a/alpha",
+      permission_mode_selected: "default",
+    }),
+  );
+
+  assert.equal(loadOpenCodePermissionMode(fullConfigPath), "full");
+
+  const fullConfig = JSON.parse(fs.readFileSync(fullConfigPath, "utf8"));
+  assert.equal(fullConfig.permission_mode_selected, undefined);
+  assert.equal(fullConfig.permission, "allow");
+  assert.equal(fullConfig.model, "provider-a/alpha");
+
+  assert.equal(loadOpenCodePermissionMode(defaultConfigPath), "");
+
+  const defaultConfig = JSON.parse(fs.readFileSync(defaultConfigPath, "utf8"));
+  assert.equal(defaultConfig.permission_mode_selected, undefined);
+  assert.equal(defaultConfig.permission, "ask");
+  assert.equal(defaultConfig.model, "provider-a/alpha");
 });
 
 test("saves OpenCode default and small model fields", () => {
