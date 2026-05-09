@@ -291,20 +291,27 @@ func loadProviderModels(providerName string) ([]provider.ConfigItem, error) {
 		configuredSet[n] = true
 	}
 
-	// Merge configured-only + remote.
+	// Merge configured + remote, keeping configured models first and de-duplicating names.
 	remoteSet := make(map[string]bool)
+	for _, n := range remoteNames {
+		remoteSet[n] = true
+	}
+
+	seen := make(map[string]bool)
 	var allNames []string
-	// Configured-only first.
 	for _, n := range configured {
-		if !remoteSet[n] {
-			allNames = append(allNames, n)
+		if n == "" || seen[n] {
+			continue
 		}
+		allNames = append(allNames, n)
+		seen[n] = true
 	}
 	for _, n := range remoteNames {
-		if !remoteSet[n] {
-			allNames = append(allNames, n)
-			remoteSet[n] = true
+		if n == "" || seen[n] {
+			continue
 		}
+		allNames = append(allNames, n)
+		seen[n] = true
 	}
 
 	items := make([]provider.ConfigItem, len(allNames))
