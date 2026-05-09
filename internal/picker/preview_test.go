@@ -29,3 +29,19 @@ func TestTruncatePreviewMessageTextLeavesShortTextUnchanged(t *testing.T) {
 		t.Fatalf("got %q, want unchanged", got)
 	}
 }
+
+func TestTruncatePreviewMessageTextCountsNonWhitespaceRunes(t *testing.T) {
+	text := strings.Repeat("a ", 250) + strings.Repeat("m ", 10) + strings.Repeat("z ", 250)
+
+	got := truncatePreviewMessageText(text)
+
+	if !strings.HasPrefix(got, strings.Repeat("a ", 250)) {
+		t.Fatalf("missing whitespace-preserving prefix")
+	}
+	if !strings.HasSuffix(got, strings.Repeat("z ", 250)) {
+		t.Fatalf("missing whitespace-preserving suffix")
+	}
+	if !strings.Contains(got, "[10 chars truncated]") {
+		t.Fatalf("missing non-whitespace truncation count in %q", got)
+	}
+}

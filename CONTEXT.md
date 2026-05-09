@@ -94,7 +94,7 @@ _Avoid_: Flattened install files
 - **Provider CLIs** keep provider-specific behavior separate from **Common support modules**.
 - A **Session renderer** may be used by any **Provider CLI**.
 - A **Session preview** belongs to the session picker and loads a **Conversation transcript** lazily.
-- A **Conversation message preview** limits one message body to 500 Unicode runes by keeping the first 250 and last 250 runes.
+- A **Conversation message preview** limits one message body to 500 non-whitespace Unicode runes by keeping the first 250 and last 250 non-whitespace runes while preserving original whitespace.
 - A **Configurations page** is reached from a workspace list and belongs to the current **Agent provider**.
 - A **Multi-select configuration list** uses blue for selected choices and cyan only for the current unselected cursor row.
 - **Provider CLIs** own **Conversation transcript** loading because session storage differs by **Agent provider**.
@@ -180,7 +180,7 @@ _Avoid_: Flattened install files
 > **Domain expert:** "Yes. A **Conversation transcript** includes useful user messages and assistant replies, while excluding tool noise and internal events."
 
 > **Dev:** "If one assistant reply is very long, does the **Session preview** print it in full?"
-> **Domain expert:** "No. It uses a **Conversation message preview** that keeps the first 250 and last 250 Unicode runes, with a body-colored truncation marker block between them."
+> **Domain expert:** "No. It uses a **Conversation message preview** that keeps the first 250 and last 250 non-whitespace Unicode runes, preserves original whitespace, and inserts a body-colored truncation marker block between them."
 
 ## Flagged ambiguities
 

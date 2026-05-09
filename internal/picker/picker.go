@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/lizhian/agent-session/internal/provider"
@@ -969,14 +970,34 @@ const previewMessageEdgeRunes = 250
 
 func truncatePreviewMessageText(text string) string {
 	runes := []rune(text)
-	if len(runes) <= previewMessageRuneLimit {
+	positions := nonWhitespaceRunePositions(runes)
+	if len(positions) <= previewMessageRuneLimit {
 		return text
 	}
-	skipped := len(runes) - previewMessageEdgeRunes*2
+
+	prefixEnd := positions[previewMessageEdgeRunes-1] + 1
+	for prefixEnd < len(runes) && unicode.IsSpace(runes[prefixEnd]) {
+		prefixEnd++
+	}
+	suffixStart := positions[len(positions)-previewMessageEdgeRunes]
+	for suffixStart > 0 && unicode.IsSpace(runes[suffixStart-1]) {
+		suffixStart--
+	}
+	skipped := len(positions) - previewMessageEdgeRunes*2
 	if skipped < 0 {
 		skipped = 0
 	}
-	return string(runes[:previewMessageEdgeRunes]) + "\n\n.\n.\n.\n" + fmt.Sprintf("[%d chars truncated]", skipped) + "\n.\n.\n.\n\n" + string(runes[len(runes)-previewMessageEdgeRunes:])
+	return string(runes[:prefixEnd]) + "\n\n.\n.\n.\n" + fmt.Sprintf("[%d chars truncated]", skipped) + "\n.\n.\n.\n\n" + string(runes[suffixStart:])
+}
+
+func nonWhitespaceRunePositions(runes []rune) []int {
+	positions := make([]int, 0, len(runes))
+	for i, r := range runes {
+		if !unicode.IsSpace(r) {
+			positions = append(positions, i)
+		}
+	}
+	return positions
 }
 
 func (m Model) renderWorkspaces() string {
