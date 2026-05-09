@@ -1,15 +1,11 @@
 {
   "name": "agent-session",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Interactive session pickers for Claude Code, Codex, and OpenCode",
-  "bin": {
-    "claude-code-session": "./claude/claude-sessions.js",
-    "codex-code-session": "./codex/codex-sessions.js",
-    "opencode-code-session": "./opencode/opencode-sessions.js"
-  },
   "scripts": {
-    "test": "node --test claude-sessions.test.js claude-model-providers.test.js codex-sessions.test.js codex-model-providers.test.js opencode-sessions.test.js opencode-provider-models.test.js provider-runner.test.js install.test.js install-windows.test.js",
-    "check": "node --check claude/claude-sessions.js && node --check claude/claude-model-providers.js && node --check codex/codex-sessions.js && node --check codex/codex-model-providers.js && node --check opencode/opencode-sessions.js && node --check opencode/opencode-provider-models.js && node --check common/session-utils.js && node --check common/session-renderer.js && node --check common/session-transcript.js && node --check common/provider-runner.js && bash -n install.sh"
+    "test": "go test ./...",
+    "check": "go vet ./... && go build ./...",
+    "build": "go build -ldflags=\"-s -w\" -o agent-session ./cmd/agent-session/"
   },
   "keywords": [
     "claude",
@@ -18,7 +14,8 @@
     "opencode",
     "session",
     "picker",
-    "cli"
+    "cli",
+    "go"
   ],
   "author": "lizhian",
   "license": "MIT"

@@ -5,10 +5,36 @@ function Fail($Message) {
   exit 1
 }
 
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-  Fail "node is required but was not found in PATH."
+# --- Detect platform ---
+$GOOS = "windows"
+$GOARCH = "amd64"
+if ($Env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
+  $GOARCH = "arm64"
 }
 
+$Suffix = "windows-${GOARCH}.exe"
+
+# --- Configuration ---
+$Repo = "lizhian/agent-session"
+$InstallDir = Join-Path $HOME ".agent-session" "bin"
+$BinaryName = "agent-session.exe"
+$BinaryPath = Join-Path $InstallDir $BinaryName
+
+$Version = if ($Env:INSTALL_VERSION) { $Env:INSTALL_VERSION } else { "latest" }
+
+$ReleaseUrl = if ($Version -eq "latest") {
+  "https://github.com/$Repo/releases/latest/download/agent-session-$Suffix"
+} else {
+  "https://github.com/$Repo/releases/download/$Version/agent-session-$Suffix"
+}
+
+$ChecksumUrl = if ($Version -eq "latest") {
+  "https://github.com/$Repo/releases/latest/download/checksums.txt"
+} else {
+  "https://github.com/$Repo/releases/download/$Version/checksums.txt"
+}
+
+# --- Check for existing agent CLIs ---
 $HasClaude = [bool](Get-Command claude -ErrorAction SilentlyContinue)
 $HasCodex = [bool](Get-Command codex -ErrorAction SilentlyContinue)
 $HasOpenCode = [bool](Get-Command opencode -ErrorAction SilentlyContinue)
@@ -16,11 +42,9 @@ $HasOpenCode = [bool](Get-Command opencode -ErrorAction SilentlyContinue)
 if (-not $HasClaude) {
   Write-Warning "claude was not found in PATH. Skipping cc function."
 }
-
 if (-not $HasCodex) {
   Write-Warning "codex was not found in PATH. Skipping cx function."
 }
-
 if (-not $HasOpenCode) {
   Write-Warning "opencode was not found in PATH. Skipping oc function."
 }
@@ -29,65 +53,55 @@ if (-not ($HasClaude -or $HasCodex -or $HasOpenCode)) {
   Fail "No supported agent CLI found in PATH. Install claude, codex, or opencode first."
 }
 
-if ($HasOpenCode -and -not (Get-Command sqlite3 -ErrorAction SilentlyContinue)) {
-  Write-Warning "sqlite3 was not found in PATH. The oc function requires sqlite3 to read OpenCode sessions."
+# --- Download ---
+Write-Host "Downloading agent-session ($Suffix)..."
+New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+
+try {
+  Invoke-WebRequest -Uri $ReleaseUrl -OutFile $BinaryPath -UseBasicParsing
+} catch {
+  Remove-Item -Path $BinaryPath -Force -ErrorAction SilentlyContinue
+  Fail "Failed to download from $ReleaseUrl. Check that the release exists."
 }
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$CommonSourceDir = Join-Path $ScriptDir "common"
-$ClaudeSourceDir = Join-Path $ScriptDir "claude"
-$CodexSourceDir = Join-Path $ScriptDir "codex"
-$OpenCodeSourceDir = Join-Path $ScriptDir "opencode"
-$SourceScript = Join-Path $ClaudeSourceDir "claude-sessions.js"
-$CodexSourceScript = Join-Path $CodexSourceDir "codex-sessions.js"
-$OpenCodeSourceScript = Join-Path $OpenCodeSourceDir "opencode-sessions.js"
-$InstallDir = Join-Path $HOME ".agent-session"
-$CommonInstallDir = Join-Path $InstallDir "common"
-$ClaudeInstallDir = Join-Path $InstallDir "claude"
-$CodexInstallDir = Join-Path $InstallDir "codex"
-$OpenCodeInstallDir = Join-Path $InstallDir "opencode"
-$InstalledScript = Join-Path $ClaudeInstallDir "claude-sessions.js"
-$CodexInstalledScript = Join-Path $CodexInstallDir "codex-sessions.js"
-$OpenCodeInstalledScript = Join-Path $OpenCodeInstallDir "opencode-sessions.js"
+Write-Host "Installed agent-session to $BinaryPath"
 
-if (-not (Test-Path (Join-Path $CommonSourceDir "session-utils.js"))) {
-  Fail "common/session-utils.js was not found next to install.ps1."
+# --- Verify checksum ---
+$ChecksumFile = Join-Path $Env:TEMP "agent-session-checksums.txt"
+try {
+  Invoke-WebRequest -Uri $ChecksumUrl -OutFile $ChecksumFile -UseBasicParsing
+  $ExpectedLine = Get-Content $ChecksumFile | Where-Object { $_ -match "agent-session-$Suffix`$" }
+  if ($ExpectedLine) {
+    $Expected = ($ExpectedLine -split '\s+')[0]
+    $Actual = (Get-FileHash -Path $BinaryPath -Algorithm SHA256).Hash.ToLower()
+    if ($Actual -ne $Expected) {
+      Remove-Item -Path $BinaryPath -Force
+      Fail "Checksum mismatch: expected $Expected, got $Actual"
+    }
+    Write-Host "Checksum verified."
+  }
+} catch {
+  # Checksum verification is optional; ignore failures.
+} finally {
+  Remove-Item -Path $ChecksumFile -Force -ErrorAction SilentlyContinue
 }
 
-if (-not (Test-Path (Join-Path $CommonSourceDir "session-renderer.js"))) {
-  Fail "common/session-renderer.js was not found next to install.ps1."
-}
+# --- Create symlinks (hardlinks on Windows) ---
+$CcPath = Join-Path $InstallDir "cc.exe"
+$CxPath = Join-Path $InstallDir "cx.exe"
+$OcPath = Join-Path $InstallDir "oc.exe"
 
-if ($HasClaude -and -not (Test-Path $SourceScript)) {
-  Fail "claude/claude-sessions.js was not found next to install.ps1."
-}
+# Remove old links if they exist.
+Remove-Item -Path $CcPath -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $CxPath -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $OcPath -Force -ErrorAction SilentlyContinue
 
-if ($HasCodex -and -not (Test-Path $CodexSourceScript)) {
-  Fail "codex/codex-sessions.js was not found next to install.ps1."
-}
+# Create hardlinks (no admin rights needed on same volume).
+New-Item -ItemType HardLink -Path $CcPath -Target $BinaryPath -Force | Out-Null
+New-Item -ItemType HardLink -Path $CxPath -Target $BinaryPath -Force | Out-Null
+New-Item -ItemType HardLink -Path $OcPath -Target $BinaryPath -Force | Out-Null
 
-if ($HasOpenCode -and -not (Test-Path $OpenCodeSourceScript)) {
-  Fail "opencode/opencode-sessions.js was not found next to install.ps1."
-}
-
-New-Item -ItemType Directory -Path $CommonInstallDir -Force | Out-Null
-Copy-Item -Path (Join-Path $CommonSourceDir "*.js") -Destination $CommonInstallDir -Force
-
-if ($HasClaude) {
-  New-Item -ItemType Directory -Path $ClaudeInstallDir -Force | Out-Null
-  Copy-Item -Path (Join-Path $ClaudeSourceDir "*.js") -Destination $ClaudeInstallDir -Force
-}
-
-if ($HasCodex) {
-  New-Item -ItemType Directory -Path $CodexInstallDir -Force | Out-Null
-  Copy-Item -Path (Join-Path $CodexSourceDir "*.js") -Destination $CodexInstallDir -Force
-}
-
-if ($HasOpenCode) {
-  New-Item -ItemType Directory -Path $OpenCodeInstallDir -Force | Out-Null
-  Copy-Item -Path (Join-Path $OpenCodeSourceDir "*.js") -Destination $OpenCodeInstallDir -Force
-}
-
+# --- Add to PATH in PowerShell profile ---
 $ProfilePath = $PROFILE.CurrentUserAllHosts
 $ProfileDir = Split-Path -Parent $ProfilePath
 if (-not (Test-Path $ProfileDir)) {
@@ -97,80 +111,46 @@ if (-not (Test-Path $ProfilePath)) {
   New-Item -ItemType File -Path $ProfilePath -Force | Out-Null
 }
 
-$BeginMarker = "# Claude Code session picker BEGIN"
-$EndMarker = "# Claude Code session picker END"
-$CodexBeginMarker = "# Codex session picker BEGIN"
-$CodexEndMarker = "# Codex session picker END"
-$OpenCodeBeginMarker = "# OpenCode session picker BEGIN"
-$OpenCodeEndMarker = "# OpenCode session picker END"
-$EscapedInstalledScript = $InstalledScript.Replace("`", "``").Replace('"', '`"')
-$EscapedCodexInstalledScript = $CodexInstalledScript.Replace("`", "``").Replace('"', '`"')
-$EscapedOpenCodeInstalledScript = $OpenCodeInstalledScript.Replace("`", "``").Replace('"', '`"')
-$AliasBlock = @'
-# Claude Code session picker BEGIN
-$script:ClaudeCodeSessionScript = "__CLAUDE_CODE_SESSION_SCRIPT__"
-function cc {
-  node $script:ClaudeCodeSessionScript --pick --trust-current-folder @args
-}
-# Claude Code session picker END
-'@
-$AliasBlock = $AliasBlock.Replace("__CLAUDE_CODE_SESSION_SCRIPT__", $EscapedInstalledScript)
-$CodexAliasBlock = @'
-# Codex session picker BEGIN
-$script:CodexSessionScript = "__CODEX_SESSION_SCRIPT__"
-function cx {
-  node $script:CodexSessionScript --pick --trust-current-folder @args
-}
-# Codex session picker END
-'@
-$CodexAliasBlock = $CodexAliasBlock.Replace("__CODEX_SESSION_SCRIPT__", $EscapedCodexInstalledScript)
-$OpenCodeAliasBlock = @'
-# OpenCode session picker BEGIN
-$script:OpenCodeSessionScript = "__OPENCODE_SESSION_SCRIPT__"
-function oc {
-  node $script:OpenCodeSessionScript --pick --trust-current-folder @args
-}
-# OpenCode session picker END
-'@
-$OpenCodeAliasBlock = $OpenCodeAliasBlock.Replace("__OPENCODE_SESSION_SCRIPT__", $EscapedOpenCodeInstalledScript)
+$BeginMarker = "# agent-session BEGIN"
+$EndMarker = "# agent-session END"
 
 $ExistingProfile = Get-Content -Raw -Path $ProfilePath
 $Pattern = "(?ms)^$([regex]::Escape($BeginMarker)).*?^$([regex]::Escape($EndMarker))\r?\n?"
 $UpdatedProfile = [regex]::Replace($ExistingProfile, $Pattern, "")
-$CodexPattern = "(?ms)^$([regex]::Escape($CodexBeginMarker)).*?^$([regex]::Escape($CodexEndMarker))\r?\n?"
-$UpdatedProfile = [regex]::Replace($UpdatedProfile, $CodexPattern, "")
-$OpenCodePattern = "(?ms)^$([regex]::Escape($OpenCodeBeginMarker)).*?^$([regex]::Escape($OpenCodeEndMarker))\r?\n?"
-$UpdatedProfile = [regex]::Replace($UpdatedProfile, $OpenCodePattern, "")
+
+# Also remove old JS-based markers.
+$JsBeginMarkers = @("# Claude Code session picker BEGIN", "# Codex session picker BEGIN", "# OpenCode session picker BEGIN")
+$JsEndMarkers = @("# Claude Code session picker END", "# Codex session picker END", "# OpenCode session picker END")
+for ($i = 0; $i -lt $JsBeginMarkers.Count; $i++) {
+  $JsPattern = "(?ms)^$([regex]::Escape($JsBeginMarkers[$i])).*?^$([regex]::Escape($JsEndMarkers[$i]))\r?\n?"
+  $UpdatedProfile = [regex]::Replace($UpdatedProfile, $JsPattern, "")
+}
+
 if ($UpdatedProfile.Length -gt 0 -and -not $UpdatedProfile.EndsWith("`n")) {
   $UpdatedProfile += "`n"
 }
-$ProfileBlocks = @()
-if ($HasClaude) {
-  $ProfileBlocks += $AliasBlock
-}
-if ($HasCodex) {
-  $ProfileBlocks += $CodexAliasBlock
-}
-if ($HasOpenCode) {
-  $ProfileBlocks += $OpenCodeAliasBlock
-}
-$UpdatedProfile += "`n$($ProfileBlocks -join "`n`n")`n"
+
+$EscapedInstallDir = $InstallDir.Replace("`", "``").Replace('"', '`"')
+$PathBlock = @"
+# agent-session BEGIN
+`$env:PATH = "$EscapedInstallDir;`$env:PATH"
+
+function cc { & "$EscapedInstallDir\agent-session.exe" cc --pick --trust-current-folder @args }
+function cx { & "$EscapedInstallDir\agent-session.exe" cx --pick --trust-current-folder @args }
+function oc { & "$EscapedInstallDir\agent-session.exe" oc --pick --trust-current-folder @args }
+# agent-session END
+"@
+
+$UpdatedProfile += "`n$PathBlock`n"
 Set-Content -Path $ProfilePath -Value $UpdatedProfile -Encoding UTF8
 
 $AvailableAliases = @()
-if ($HasClaude) {
-  Write-Host "Installed claude/claude-sessions.js to $InstalledScript"
-  Write-Host "Added cc function to $ProfilePath"
-  $AvailableAliases += "cc"
-}
-if ($HasCodex) {
-  Write-Host "Installed codex/codex-sessions.js to $CodexInstalledScript"
-  Write-Host "Added cx function to $ProfilePath"
-  $AvailableAliases += "cx"
-}
-if ($HasOpenCode) {
-  Write-Host "Installed opencode/opencode-sessions.js to $OpenCodeInstalledScript"
-  Write-Host "Added oc function to $ProfilePath"
-  $AvailableAliases += "oc"
-}
-Write-Host "Restart PowerShell or run: . `$PROFILE. Then use: $($AvailableAliases -join ', ')"
+if ($HasClaude)  { $AvailableAliases += "cc" }
+if ($HasCodex)   { $AvailableAliases += "cx" }
+if ($HasOpenCode) { $AvailableAliases += "oc" }
+
+Write-Host ""
+Write-Host "Done! Restart PowerShell or run: . `$PROFILE"
+Write-Host "Then use: $($AvailableAliases -join ', ')"
+$Size = (Get-Item $BinaryPath).Length / 1MB
+Write-Host "Binary: $BinaryPath ($([math]::Round($Size, 1)) MB)"
