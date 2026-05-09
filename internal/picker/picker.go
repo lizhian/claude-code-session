@@ -808,42 +808,79 @@ func (m Model) renderConfigurations() string {
 
 	idx := render.ClampSelectedIndex(m.configSelectedIndex, len(items))
 	numberWidth := 2
+	nameWidth := 0
 
-	for i := range items {
+	ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
+
+	// Pre-compute all action columns to determine alignment widths.
+	type actionRow struct {
+		action     provider.ConfigAction
+		colTexts   []string
+	}
+	rows := make([]actionRow, len(items))
+
+	// Determine max column count and compute per-column widths.
+	maxCols := 0
+	for i, action := range items {
 		num := fmt.Sprintf("%d.", i)
 		if len(num) > numberWidth {
 			numberWidth = len(num)
 		}
+		nw := render.DisplayWidth(action.Name)
+		if nw > nameWidth {
+			nameWidth = nw
+		}
+		if action.Columns != nil {
+			cols := action.Columns(ctx)
+			var texts []string
+			for _, col := range cols {
+				if col.Value != "" {
+					texts = append(texts, col.Value)
+				}
+			}
+			rows[i] = actionRow{action: action, colTexts: texts}
+			if len(texts) > maxCols {
+				maxCols = len(texts)
+			}
+		} else {
+			rows[i] = actionRow{action: action}
+		}
 	}
 
-	// Render the action-level columns (current values) next to each action name.
-	ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
+	colWidths := make([]int, maxCols)
+	for _, row := range rows {
+		for ci, t := range row.colTexts {
+			w := render.DisplayWidth(t)
+			if w > colWidths[ci] {
+				colWidths[ci] = w
+			}
+		}
+	}
 
 	maxItemRows := max(1, m.height-6)
 	start := max(0, min(idx-maxItemRows+1, len(items)-maxItemRows))
-	visibleItems := items[start:min(start+maxItemRows, len(items))]
+	visibleItems := rows[start:min(start+maxItemRows, len(rows))]
 
-	for vi, action := range visibleItems {
+	for vi, row := range visibleItems {
 		itemIndex := start + vi
 		prefix := "  "
 		if itemIndex == idx {
 			prefix = "> "
 		}
 
-		line := fmt.Sprintf("%s%s %s", prefix, render.PadDisplay(fmt.Sprintf("%d.", itemIndex), numberWidth, "right"), action.Name)
+		namePart := render.PadDisplay(row.action.Name, nameWidth, "left")
 
-		// Append action-level columns (current value preview).
-		if action.Columns != nil {
-			cols := action.Columns(ctx)
-			var colTexts []string
-			for _, col := range cols {
-				if col.Value != "" {
-					colTexts = append(colTexts, col.Value)
+		line := fmt.Sprintf("%s%s %s", prefix, render.PadDisplay(fmt.Sprintf("%d.", itemIndex), numberWidth, "right"), namePart)
+
+		// Append columns with alignment.
+		if len(row.colTexts) > 0 {
+			var aligned []string
+			for ci, t := range row.colTexts {
+				if ci < len(colWidths) {
+					aligned = append(aligned, render.PadDisplay(t, colWidths[ci], "left"))
 				}
 			}
-			if len(colTexts) > 0 {
-				line += "  " + strings.Join(colTexts, "  ")
-			}
+			line += "  " + strings.Join(aligned, "  ")
 		}
 
 		fittedLine := render.FitLine(line, m.width)
