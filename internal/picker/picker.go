@@ -2,6 +2,7 @@ package picker
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -44,7 +45,8 @@ type Model struct {
 	permissionMode string
 
 	// Current working directory.
-	cwd string
+	cwd     string
+	cwdFile string
 
 	// Configuration state.
 	configActions  []provider.ConfigAction
@@ -79,6 +81,7 @@ func NewModel(p provider.Provider, sessions []provider.Session, cwd, permissionM
 		sessionSelectedIndex: 1,
 		permissionMode:       session.NormalizePermissionMode(permissionMode, p.PermissionModes()),
 		cwd:                  cwd,
+		cwdFile:              os.Getenv("AGENT_SESSION_CWD_FILE"),
 		width:                width,
 		height:               height,
 		useColor:             useColor,
@@ -416,12 +419,20 @@ func (m Model) selectSession() (tea.Model, tea.Cmd) {
 	return m, tea.Quit
 }
 
+func (m Model) writeSelectedCwd() {
+	if m.cwdFile == "" || m.cwd == "" {
+		return
+	}
+	_ = os.WriteFile(m.cwdFile, []byte(m.cwd+"\n"), 0o600)
+}
+
 func (m Model) selectWorkspace() (tea.Model, tea.Cmd) {
 	items := m.currentWorkspaceItems()
 	idx := render.ClampSelectedIndex(m.workspaceSelectedIndex, len(items))
 	if idx < len(items) && items[idx].Type == "workspace" {
 		ws := items[idx].Workspace
 		m.cwd = m.provider.WorkspaceCwd(ws, m.cwd)
+		m.writeSelectedCwd()
 		ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
 		m.sessions = m.provider.ListSessions(ctx)
 		m.view = ViewSessions

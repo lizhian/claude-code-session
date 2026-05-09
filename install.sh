@@ -109,34 +109,60 @@ rm -f "$CHECKSUM_FILE"
 mv -f "$TMP_BINARY" "$BINARY_PATH"
 info "Installed agent-session to $BINARY_PATH"
 
-# --- Create symlinks ---
+# --- Create symlinks for direct binary use ---
 ln -sf "$BINARY_PATH" "$INSTALL_DIR/cc"
 ln -sf "$BINARY_PATH" "$INSTALL_DIR/cx"
 ln -sf "$BINARY_PATH" "$INSTALL_DIR/oc"
 
-# --- Add to PATH in shell rc ---
+# --- Add shell functions so workspace selection can cd the parent shell ---
 if [[ -n "${SHELL:-}" && "$(basename "$SHELL")" == "bash" ]]; then
   shell_rc="$HOME/.bashrc"
 else
   shell_rc="$HOME/.zshrc"
 fi
 
-marker="# agent-session PATH"
+begin_marker="# agent-session BEGIN"
+end_marker="# agent-session END"
 touch "$shell_rc"
 
-# Remove old agent-session markers.
+# Remove old agent-session blocks and legacy PATH marker.
 tmp_file="$(mktemp)"
-awk -v marker="$marker" '
-  $0 == marker { getline; next }
+awk -v begin="$begin_marker" -v end="$end_marker" -v legacy="# agent-session PATH" '
+  $0 == begin { skip = 1; next }
+  $0 == end { skip = 0; next }
+  skip { next }
+  $0 == legacy { getline; next }
   { print }
 ' "$shell_rc" > "$tmp_file"
 mv "$tmp_file" "$shell_rc"
 
-if [[ ":${PATH}:" != *":$INSTALL_DIR:"* ]]; then
-  printf '\n%s\nexport PATH="%s' "$marker" "$INSTALL_DIR" >> "$shell_rc"
-  printf ':$PATH"\n' >> "$shell_rc"
-  info "Added $INSTALL_DIR to PATH in $shell_rc"
-fi
+cat >> "$shell_rc" <<EOF
+
+$begin_marker
+export PATH="$INSTALL_DIR:\$PATH"
+_agent_session_run() {
+  local cmd="\$1"
+  shift
+  local cwd_file
+  cwd_file="\$(mktemp)" || return
+  AGENT_SESSION_CWD_FILE="\$cwd_file" "$BINARY_PATH" "\$cmd" "\$@"
+  local status=\$?
+  if [ -s "\$cwd_file" ]; then
+    local target_dir
+    target_dir="\$(tail -n 1 "\$cwd_file")"
+    if [ -n "\$target_dir" ] && [ -d "\$target_dir" ]; then
+      cd "\$target_dir" || status=\$?
+    fi
+  fi
+  rm -f "\$cwd_file"
+  return \$status
+}
+cc() { _agent_session_run cc "\$@"; }
+cx() { _agent_session_run cx "\$@"; }
+oc() { _agent_session_run oc "\$@"; }
+$end_marker
+EOF
+info "Added agent-session shell functions to $shell_rc"
 
 # --- Remove old JS aliases if present ---
 js_markers=("# Claude Code session picker" "# Codex session picker" "# OpenCode session picker")
