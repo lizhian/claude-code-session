@@ -551,12 +551,14 @@ func (m Model) selectConfigurationSubitems() (tea.Model, tea.Cmd) {
 		m.configStatus = err.Error()
 	} else {
 		m.configStatus = status
+		m.configActions = m.provider.ConfigurationActions()
 	}
 	m.view = ViewConfigurations
 	m.activeAction = nil
 	m.activeItem = nil
 	m.configItems = nil
 	m.configSubitems = nil
+	m.configSelectedIndex = render.ClampSelectedIndex(m.configSelectedIndex, len(m.configActions))
 	return m, nil
 }
 
