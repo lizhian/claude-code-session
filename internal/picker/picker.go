@@ -964,8 +964,8 @@ func previewMessageCount(messages []provider.TranscriptMessage) int {
 	return count
 }
 
-const previewMessageRuneLimit = 300
-const previewMessageEdgeRunes = 150
+const previewMessageRuneLimit = 500
+const previewMessageEdgeRunes = 250
 
 func truncatePreviewMessageText(text string) string {
 	runes := []rune(text)
@@ -976,7 +976,7 @@ func truncatePreviewMessageText(text string) string {
 	if skipped < 0 {
 		skipped = 0
 	}
-	return string(runes[:previewMessageEdgeRunes]) + "\n\n" + fmt.Sprintf("[%d chars truncated]", skipped) + "\n\n" + string(runes[len(runes)-previewMessageEdgeRunes:])
+	return string(runes[:previewMessageEdgeRunes]) + "\n\n.\n.\n.\n" + fmt.Sprintf("[%d chars truncated]", skipped) + "\n.\n.\n.\n\n" + string(runes[len(runes)-previewMessageEdgeRunes:])
 }
 
 func (m Model) renderWorkspaces() string {
