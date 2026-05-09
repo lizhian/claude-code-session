@@ -16,9 +16,12 @@ import (
 // View represents the current screen in the picker state machine.
 type View int
 
+type terminalPreviewReadyMsg struct{}
+
 const (
 	ViewSessions View = iota
 	ViewPreview
+	ViewTerminalPreview
 	ViewWorkspaces
 	ViewConfigurations
 	ViewConfigurationItems
@@ -106,6 +109,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
 
+	case terminalPreviewReadyMsg:
+		if m.view == ViewTerminalPreview {
+			fmt.Print("\x1b[H\x1b[2J")
+			items := m.currentSessionItems()
+			idx := render.ClampSelectedIndex(m.sessionSelectedIndex, len(items))
+			if idx < len(items) && items[idx].Type == "session" && items[idx].Session != nil {
+				fmt.Print(m.terminalPreviewText(*items[idx].Session))
+			}
+		}
+		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -116,10 +130,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg.String() {
 		case "esc":
+			if m.view == ViewTerminalPreview {
+				return m.closeTerminalPreview()
+			}
 			return m.handleEscape()
 		case "enter", "return":
+			if m.view == ViewTerminalPreview {
+				return m.closeTerminalPreview()
+			}
 			return m.handleEnter()
 		case " ":
+			if m.view == ViewTerminalPreview {
+				return m.closeTerminalPreview()
+			}
 			return m.handleSpace()
 		case "tab":
 			return m.handleTab()
@@ -134,6 +157,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "backspace":
 			return m.handleBackspace()
 		default:
+			if m.view == ViewTerminalPreview {
+				if len(msg.Runes) == 1 && (msg.Runes[0] == 'q' || msg.Runes[0] == 'Q') {
+					return m.closeTerminalPreview()
+				}
+				return m, nil
+			}
 			// Printable characters go to the search query.
 			if len(msg.Runes) == 1 && msg.Runes[0] >= 32 && msg.Runes[0] < 127 {
 				return m.handleChar(msg.Runes[0])
@@ -154,6 +183,8 @@ func (m Model) View() string {
 		return m.renderSessions()
 	case ViewPreview:
 		return m.renderPreview()
+	case ViewTerminalPreview:
+		return ""
 	case ViewWorkspaces:
 		return m.renderWorkspaces()
 	case ViewConfigurations:
@@ -209,6 +240,16 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) closeTerminalPreview() (tea.Model, tea.Cmd) {
+	fmt.Print("\x1b[H\x1b[2J")
+	m.view = ViewSessions
+	m.previewTranscript = nil
+	m.previewError = ""
+	m.previewScroll = 0
+	m.previewAutoBottom = false
+	return m, tea.Sequence(tea.EnterAltScreen, tea.EnableMouseCellMotion)
+}
+
 func (m Model) handleEscape() (tea.Model, tea.Cmd) {
 	switch m.view {
 	case ViewPreview:
@@ -262,15 +303,17 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 func (m Model) handleSpace() (tea.Model, tea.Cmd) {
 	switch m.view {
 	case ViewSessions:
-		// Enter preview mode for selected session.
+		// Enter terminal preview mode for selected session.
 		items := m.currentSessionItems()
 		idx := render.ClampSelectedIndex(m.sessionSelectedIndex, len(items))
 		if idx < len(items) && items[idx].Type == "session" && items[idx].Session != nil {
-			m.previewTranscript = m.provider.LoadSessionTranscript(*items[idx].Session, provider.Context{Cwd: m.cwd})
+			s := *items[idx].Session
+			m.previewTranscript = m.provider.LoadSessionTranscript(s, provider.Context{Cwd: m.cwd})
 			m.previewError = ""
 			m.previewScroll = 0
-			m.previewAutoBottom = true
-			m.view = ViewPreview
+			m.previewAutoBottom = false
+			m.view = ViewTerminalPreview
+			return m, tea.Sequence(tea.ExitAltScreen, tea.DisableMouse, printTerminalPreview())
 		}
 		return m, nil
 	case ViewPreview:
@@ -780,6 +823,57 @@ func (m Model) renderSessions() string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func printTerminalPreview() tea.Cmd {
+	return func() tea.Msg {
+		return terminalPreviewReadyMsg{}
+	}
+}
+
+func (m Model) terminalPreviewText(s provider.Session) string {
+	width := m.width
+	if width <= 0 {
+		width = 80
+	}
+	now := time.Now()
+	lines := []string{
+		render.FitLine(m.provider.Name()+" session preview", width),
+		render.FitLine("Workspace: "+m.cwd, width),
+		render.FitLine("Session: "+s.ID, width),
+		render.FitLine(fmt.Sprintf("Messages: %d", s.MessageCount), width),
+		render.FitLine("Started: "+s.StartedAt, width),
+		render.FitLine("Updated: "+s.UpdatedAt, width),
+		render.FitLine(fmt.Sprintf("Transcript: %d conversation messages", previewMessageCount(m.previewTranscript)), width),
+	}
+	for i, msg := range m.previewTranscript {
+		lines = append(lines, "")
+		if msg.Role == "omitted" {
+			for _, omittedLine := range []string{".", ".", ".", msg.Text, ".", ".", "."} {
+				lines = append(lines, render.Colorize(render.FitLine(omittedLine, width), render.ANSIPreviewOmitted, m.useColor))
+			}
+			continue
+		}
+		ordinal := msg.Ordinal
+		if ordinal <= 0 {
+			ordinal = i + 1
+		}
+		role := strings.ToLower(msg.Role)
+		header := render.Colorize(
+			fmt.Sprintf("#%d %s %s", ordinal, role, render.FormatSessionTime(msg.Timestamp, now)),
+			render.ANSIPreviewMeta,
+			m.useColor,
+		)
+		lines = append(lines, render.FitLine(header, width))
+		for _, line := range render.WrapTextPreserveNewlines(msg.Text, width) {
+			fitted := render.FitLine(line, width)
+			if role == "assistant" {
+				fitted = render.Colorize(fitted, render.ANSIPreviewMuted, m.useColor)
+			}
+			lines = append(lines, fitted)
+		}
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func (m Model) renderPreview() string {
