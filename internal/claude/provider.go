@@ -3,6 +3,7 @@ package claude
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/lizhian/agent-session/internal/provider"
 	"github.com/lizhian/agent-session/internal/session"
@@ -89,6 +90,27 @@ func (p *ClaudeProvider) TrustCurrentFolder(cwd string, ctx provider.Context) er
 func (p *ClaudeProvider) ConfigurationTitle() string { return "Claude Code configurations" }
 
 func (p *ClaudeProvider) ConfigurationActions() []provider.ConfigAction {
+	makeModelAction := func(name, title, field string) provider.ConfigAction {
+		return provider.ConfigAction{
+			Name:  name,
+			Title: title,
+			Columns: func(ctx provider.Context) []provider.ConfigColumn {
+				val := currentClaudeModelColumn(ModelFields[field], ctx.DataHome)
+				return []provider.ConfigColumn{{Name: "model", Value: strings.Join(val, "")}}
+			},
+			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
+				return LoadClaudeModelChoices(ModelFields[field], ctx.DataHome)
+			},
+			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
+				if err := saveClaudeModel(ModelFields[field], item.Name, ctx.DataHome); err != nil {
+					return "", err
+				}
+				return "Updated " + name + ": " + item.Name, nil
+			},
+			EmptyMessage: "No models.",
+		}
+	}
+
 	return []provider.ConfigAction{
 		{
 			Name:         "Model provider",
@@ -109,7 +131,6 @@ func (p *ClaudeProvider) ConfigurationActions() []provider.ConfigAction {
 				}
 				items := make([]provider.ConfigItem, len(entries))
 				for i, e := range entries {
-					// Show the provider's base_url as a column.
 					url := ""
 					if e.Provider != nil {
 						if u, ok := e.Provider["ANTHROPIC_BASE_URL"].(string); ok {
@@ -136,6 +157,9 @@ func (p *ClaudeProvider) ConfigurationActions() []provider.ConfigAction {
 				return "Selected model provider: " + item.Name, nil
 			},
 		},
+		makeModelAction("Opus model", "Claude Code Opus model", "opus"),
+		makeModelAction("Sonnet model", "Claude Code Sonnet model", "sonnet"),
+		makeModelAction("Haiku model", "Claude Code Haiku model", "haiku"),
 	}
 }
 

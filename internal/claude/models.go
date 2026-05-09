@@ -294,8 +294,4 @@ func markProjectTrusted(cwd string) error {
 	return session.WriteConfig(config, configPath)
 }
 
-// FetchClaudeModelNames fetches model names from the Anthropic API.
-// This requires network access and is only used for model selection.
-func FetchClaudeModelNames(provider map[string]interface{}) ([]string, error) {
-	return nil, fmt.Errorf("fetch model names not yet implemented in Go version")
-}
+// FetchClaudeModelNames is implemented in fetch.go.
