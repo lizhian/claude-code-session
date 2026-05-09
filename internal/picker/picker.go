@@ -236,6 +236,9 @@ func (m Model) handleSpace() (tea.Model, tea.Cmd) {
 		idx := render.ClampSelectedIndex(m.configItemSelectedIndex, len(m.configSubitems))
 		if idx < len(m.configSubitems) {
 			m.configSubitems[idx].Selected = !m.configSubitems[idx].Selected
+			if idx+1 < len(m.configSubitems) {
+				m.configItemSelectedIndex = idx + 1
+			}
 		}
 		return m, nil
 	}
