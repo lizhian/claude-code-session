@@ -312,6 +312,10 @@ func loadProviderModels(providerName string) ([]provider.ConfigItem, error) {
 		seen[n] = true
 	}
 
+	sort.SliceStable(allNames, func(i, j int) bool {
+		return strings.ToLower(allNames[i]) < strings.ToLower(allNames[j])
+	})
+
 	items := make([]provider.ConfigItem, len(allNames))
 	for i, name := range allNames {
 		items[i] = provider.ConfigItem{
