@@ -183,14 +183,6 @@ func ParseArgs(args []string) (map[string]string, error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
-		case arg == "--json":
-			opts["json"] = "true"
-		case arg == "--pick":
-			// Accepted for compatibility; picker is now the default.
-		case arg == "--list":
-			opts["list"] = "true"
-		case arg == "--trust-current-folder":
-			opts["trustCurrentFolder"] = "true"
 		case arg == "--help", arg == "-h":
 			opts["help"] = "true"
 		case arg == "--cwd" && i+1 < len(args):
