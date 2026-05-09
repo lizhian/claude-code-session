@@ -1,9 +1,20 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/lizhian/agent-session/internal/claude"
+	"github.com/lizhian/agent-session/internal/picker"
+	"github.com/lizhian/agent-session/internal/provider"
+	"github.com/lizhian/agent-session/internal/render"
+	"github.com/lizhian/agent-session/internal/session"
 )
 
 const usageText = `agent-session - Interactive session pickers for Claude Code, Codex, and OpenCode
@@ -103,9 +114,81 @@ func run(providerName string, args []string) error {
 	}
 }
 
-// Placeholder functions — will be replaced by real provider implementations.
 func runClaude(args []string) error {
-	return fmt.Errorf("Claude Code provider not yet implemented (Phase 2)")
+	opts, err := claude.ParseArgs(args)
+	if err != nil {
+		return err
+	}
+
+	p := claude.New()
+	cwd := opts["cwd"]
+	home := session.ResolvePath(opts["claudeHome"], p.DefaultHome())
+	ctx := provider.Context{Cwd: cwd, DataHome: home, HomeOptionName: p.HomeOptionName()}
+
+	sessions := p.ListSessions(ctx)
+
+	if opts["help"] == "true" {
+		fmt.Print(claudeUsage())
+		return nil
+	}
+
+	// --trust-current-folder (non-interactive).
+	if opts["trustCurrentFolder"] == "true" && opts["pick"] != "true" && opts["json"] != "true" {
+		if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
+		}
+	}
+
+	// --json mode.
+	if opts["json"] == "true" {
+		payload := claude.JsonPayload(cwd, home, sessions)
+		data, _ := json.MarshalIndent(payload, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	}
+
+	// --pick mode.
+	if opts["pick"] == "true" {
+		permissionMode := p.LoadPermissionMode(ctx)
+
+		// Trust current folder if requested.
+		if opts["trustCurrentFolder"] == "true" {
+			if err := p.TrustCurrentFolder(cwd, ctx); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to trust folder: %s\n", err)
+			}
+		}
+
+		m := picker.NewModel(p, sessions, cwd, permissionMode, 100, 24, true)
+		pgm := tea.NewProgram(m, tea.WithAltScreen())
+		resultModel, err := pgm.Run()
+		if err != nil {
+			return err
+		}
+
+		pm := resultModel.(picker.Model)
+		if pm.Result() == nil {
+			os.Exit(130)
+			return nil
+		}
+
+		pickResult := pm.Result()
+		cmd := p.SelectedItemToCommand(pickResult.Item, pickResult.PermissionMode, pickResult.Cwd)
+
+		// Trust current folder after picking.
+		if opts["trustCurrentFolder"] == "true" {
+			_ = p.TrustCurrentFolder(pickResult.Cwd, ctx)
+		}
+
+		return session.RunCommand(cmd.Command, cmd.Args, cmd.Cwd, cmd.Env)
+	}
+
+	// Default: summary + session table.
+	for _, line := range claude.SummaryLines(cwd, home, sessions) {
+		fmt.Println(line)
+	}
+	fmt.Println()
+	fmt.Println(render.FormatSessions(sessions, "Claude Code"))
+	return nil
 }
 
 func runCodex(args []string) error {
@@ -159,4 +242,33 @@ Options:
   --opencode-data-home <path>  OpenCode data directory (default: ~/.local/share/opencode)
   -h, --help                   Show help
 `
+}
+
+// pickItemFromInteractivePicker runs the interactive picker and returns the result.
+// Used as a fallback for non-TTY mode.
+func runNonInteractivePicker(p provider.Provider, sessions []provider.Session, opts map[string]string) error {
+	fmt.Println(render.FormatPicker(sessions, time.Now()))
+	fmt.Println()
+
+	cwd := opts["cwd"]
+	ctx := provider.Context{Cwd: cwd, DataHome: p.DefaultHome()}
+	permissionMode := p.LoadPermissionMode(ctx)
+
+	fmt.Print("选择 session 编号，直接回车创建 New session: ")
+	var choice string
+	fmt.Scanln(&choice)
+
+	if opts["trustCurrentFolder"] == "true" {
+		_ = p.TrustCurrentFolder(cwd, ctx)
+	}
+
+	// Build command from choice.
+	switch pp := p.(type) {
+	case *claude.ClaudeProvider:
+		cmd, args := claude.BuildClaudeCommand(sessions, strings.TrimSpace(choice), permissionMode)
+		return session.RunCommand(cmd, args, cwd, nil)
+	default:
+		_ = pp
+		return fmt.Errorf("non-interactive picker not supported for this provider")
+	}
 }

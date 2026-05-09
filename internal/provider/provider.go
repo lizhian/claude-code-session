@@ -35,6 +35,7 @@ type TranscriptMessage struct {
 	Role      string `json:"role"`
 	Timestamp string `json:"timestamp"`
 	Text      string `json:"text"`
+	Ordinal   int    `json:"ordinal,omitempty"`
 }
 
 // PickItem is either a "new" entry or an existing session.
