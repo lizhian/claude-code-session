@@ -65,7 +65,7 @@ type ConfigItem struct {
 	Name     string         `json:"name"`
 	Label    string         `json:"label,omitempty"`
 	Selected bool           `json:"selected,omitempty"`
-	Columns []ConfigColumn `json:"columns,omitempty"`
+	Columns  []ConfigColumn `json:"columns,omitempty"`
 }
 
 // ConfigColumn describes a column to display in a configuration list.
@@ -76,25 +76,26 @@ type ConfigColumn struct {
 
 // ConfigAction defines a configuration section (e.g., model provider selection).
 type ConfigAction struct {
-	Name               string
-	Title              string
-	Mode               string // "" or "multiselect"
-	EmptyMessage       string
+	Name                 string
+	Title                string
+	Mode                 string // "" or "multiselect"
+	DirectItem           *ConfigItem
+	EmptyMessage         string
 	EmptySubitemsMessage string
-	Columns            func(ctx Context) []ConfigColumn
-	LoadItems          func(ctx Context) ([]ConfigItem, error)
-	LoadSubitems       func(item ConfigItem, ctx Context) ([]ConfigItem, error)
-	ApplyItem          func(item ConfigItem, ctx Context) (string, error)
-	ApplySubitems      func(item ConfigItem, selected []ConfigItem, ctx Context) (string, error)
-	SubitemsTitle      func(item ConfigItem) string
+	Columns              func(ctx Context) []ConfigColumn
+	LoadItems            func(ctx Context) ([]ConfigItem, error)
+	LoadSubitems         func(item ConfigItem, ctx Context) ([]ConfigItem, error)
+	ApplyItem            func(item ConfigItem, ctx Context) (string, error)
+	ApplySubitems        func(item ConfigItem, selected []ConfigItem, ctx Context) (string, error)
+	SubitemsTitle        func(item ConfigItem) string
 }
 
 // Context carries provider-specific runtime context (cwd, dataHome, etc).
 type Context struct {
-	Cwd             string
-	DataHome        string
-	HomeOptionName  string
-	Options         map[string]string
+	Cwd            string
+	DataHome       string
+	HomeOptionName string
+	Options        map[string]string
 }
 
 // Provider is the interface each agent (Claude, Codex, OpenCode) must implement.

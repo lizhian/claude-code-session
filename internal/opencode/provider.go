@@ -19,8 +19,8 @@ func (p *OpenCodeProvider) ConfigPath() string {
 	return filepath.Join(session.HomeDir(), ".agent-session", "opencode.json")
 }
 
-func (p *OpenCodeProvider) DefaultHome() string { return defaultOpenCodeDataHome() }
-func (p *OpenCodeProvider) HomeOptionName() string { return "opencodeDataHome" }
+func (p *OpenCodeProvider) DefaultHome() string       { return defaultOpenCodeDataHome() }
+func (p *OpenCodeProvider) HomeOptionName() string    { return "opencodeDataHome" }
 func (p *OpenCodeProvider) PermissionModes() []string { return session.OpenCodePermissionModes }
 
 func (p *OpenCodeProvider) ListSessions(ctx provider.Context) []provider.Session {
@@ -82,15 +82,62 @@ func (p *OpenCodeProvider) TrustCurrentFolder(cwd string, ctx provider.Context) 
 func (p *OpenCodeProvider) ConfigurationTitle() string { return "OpenCode configurations" }
 
 func (p *OpenCodeProvider) ConfigurationActions() []provider.ConfigAction {
-	return []provider.ConfigAction{
-		{
-			Name:               "Provider models",
-			Title:              "OpenCode providers",
-			Mode:               "multiselect",
-			EmptyMessage:       "No @ai-sdk providers.",
-			EmptySubitemsMessage: "No models.",
+	actions := openCodeProviderModelActions()
+	actions = append(actions,
+		provider.ConfigAction{
+			Name:  "Default model",
+			Title: "OpenCode default model",
+			Columns: func(ctx provider.Context) []provider.ConfigColumn {
+				return []provider.ConfigColumn{{Value: loadConfiguredModelValue("model")}}
+			},
 			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
-				return loadAiSdkProviders()
+				return loadConfiguredModelChoices("model")
+			},
+			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
+				if err := saveConfiguredModel("model", item.Name); err != nil {
+					return "", err
+				}
+				return "Updated default model: " + item.Name, nil
+			},
+			EmptyMessage: "No configured models.",
+		},
+		provider.ConfigAction{
+			Name:  "Small model",
+			Title: "OpenCode small model",
+			Columns: func(ctx provider.Context) []provider.ConfigColumn {
+				return []provider.ConfigColumn{{Value: loadConfiguredModelValue("small_model")}}
+			},
+			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
+				return loadConfiguredModelChoices("small_model")
+			},
+			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
+				if err := saveConfiguredModel("small_model", item.Name); err != nil {
+					return "", err
+				}
+				return "Updated small model: " + item.Name, nil
+			},
+			EmptyMessage: "No configured models.",
+		},
+	)
+	return actions
+}
+
+func openCodeProviderModelActions() []provider.ConfigAction {
+	items, err := loadAiSdkProviders()
+	if err != nil {
+		return nil
+	}
+	actions := make([]provider.ConfigAction, 0, len(items))
+	for _, item := range items {
+		item := item
+		actions = append(actions, provider.ConfigAction{
+			Name:                 "Provider " + item.Name,
+			Title:                "OpenCode models: " + item.Name,
+			Mode:                 "multiselect",
+			DirectItem:           &item,
+			EmptySubitemsMessage: "No models.",
+			Columns: func(ctx provider.Context) []provider.ConfigColumn {
+				return item.Columns
 			},
 			LoadSubitems: func(item provider.ConfigItem, ctx provider.Context) ([]provider.ConfigItem, error) {
 				return loadProviderModels(item.Name)
@@ -108,42 +155,9 @@ func (p *OpenCodeProvider) ConfigurationActions() []provider.ConfigAction {
 				}
 				return fmt.Sprintf("Updated models for %s: %d selected", item.Name, len(names)), nil
 			},
-		},
-		{
-			Name:  "Default model",
-			Title: "OpenCode default model",
-			Columns: func(ctx provider.Context) []provider.ConfigColumn {
-				return []provider.ConfigColumn{{Value: loadConfiguredModelValue("model")}}
-			},
-			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
-				return loadConfiguredModelChoices("model")
-			},
-			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
-				if err := saveConfiguredModel("model", item.Name); err != nil {
-					return "", err
-				}
-				return "Updated default model: " + item.Name, nil
-			},
-			EmptyMessage: "No configured models.",
-		},
-		{
-			Name:  "Small model",
-			Title: "OpenCode small model",
-			Columns: func(ctx provider.Context) []provider.ConfigColumn {
-				return []provider.ConfigColumn{{Value: loadConfiguredModelValue("small_model")}}
-			},
-			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
-				return loadConfiguredModelChoices("small_model")
-			},
-			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
-				if err := saveConfiguredModel("small_model", item.Name); err != nil {
-					return "", err
-				}
-				return "Updated small model: " + item.Name, nil
-			},
-			EmptyMessage: "No configured models.",
-		},
+		})
 	}
+	return actions
 }
 
 func (p *OpenCodeProvider) WorkspaceCwd(workspace provider.Workspace, currentCwd string) string {
@@ -156,7 +170,7 @@ func (p *OpenCodeProvider) WorkspaceCwd(workspace provider.Workspace, currentCwd
 // ParseArgs parses CLI arguments for the OpenCode provider.
 func ParseArgs(args []string) (map[string]string, error) {
 	opts := map[string]string{
-		"cwd":             ".",
+		"cwd":              ".",
 		"opencodeDataHome": defaultOpenCodeDataHome(),
 	}
 
@@ -191,10 +205,10 @@ func ParseArgs(args []string) (map[string]string, error) {
 // JsonPayload builds the JSON output payload.
 func JsonPayload(cwd, dataHome string, sessions []provider.Session) map[string]interface{} {
 	return map[string]interface{}{
-		"cwd":             cwd,
+		"cwd":              cwd,
 		"opencodeDataHome": dataHome,
-		"count":           len(sessions),
-		"sessions":        sessions,
+		"count":            len(sessions),
+		"sessions":         sessions,
 	}
 }
 

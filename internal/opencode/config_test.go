@@ -1,6 +1,7 @@
 package opencode
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/lizhian/agent-session/internal/provider"
@@ -11,14 +12,28 @@ func TestConfigurationActions(t *testing.T) {
 	ctx := provider.Context{Cwd: ".", DataHome: p.DefaultHome()}
 
 	actions := p.ConfigurationActions()
-	if len(actions) != 3 {
-		t.Fatalf("expected 3 configuration actions, got %d", len(actions))
+	if len(actions) < 2 {
+		t.Fatalf("expected at least Default model and Small model actions, got %d", len(actions))
 	}
 
-	expectedNames := []string{"Provider models", "Default model", "Small model"}
-	for i, expected := range expectedNames {
-		if actions[i].Name != expected {
-			t.Errorf("action[%d]: expected name %q, got %q", i, expected, actions[i].Name)
+	defaultIdx := len(actions) - 2
+	smallIdx := len(actions) - 1
+	if actions[defaultIdx].Name != "Default model" {
+		t.Errorf("second-to-last action: expected %q, got %q", "Default model", actions[defaultIdx].Name)
+	}
+	if actions[smallIdx].Name != "Small model" {
+		t.Errorf("last action: expected %q, got %q", "Small model", actions[smallIdx].Name)
+	}
+
+	for i, action := range actions[:defaultIdx] {
+		if !strings.HasPrefix(action.Name, "Provider ") {
+			t.Errorf("provider action[%d]: expected Provider prefix, got %q", i, action.Name)
+		}
+		if action.Mode != "multiselect" {
+			t.Errorf("provider action[%d]: expected multiselect mode, got %q", i, action.Mode)
+		}
+		if action.DirectItem == nil {
+			t.Errorf("provider action[%d]: expected DirectItem", i)
 		}
 	}
 

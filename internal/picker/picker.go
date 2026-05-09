@@ -25,10 +25,10 @@ const (
 
 // Model is the bubbletea Model for the interactive session picker.
 type Model struct {
-	provider     provider.Provider
-	sessions     []provider.Session
-	workspaces   []provider.Workspace
-	view         View
+	provider   provider.Provider
+	sessions   []provider.Session
+	workspaces []provider.Workspace
+	view       View
 
 	// Navigation state.
 	sessionSelectedIndex    int
@@ -47,12 +47,12 @@ type Model struct {
 	cwd string
 
 	// Configuration state.
-	configActions []provider.ConfigAction
-	configItems   []provider.ConfigItem
+	configActions  []provider.ConfigAction
+	configItems    []provider.ConfigItem
 	configSubitems []provider.ConfigItem
-	activeAction  *provider.ConfigAction
-	activeItem    *provider.ConfigItem
-	configStatus  string
+	activeAction   *provider.ConfigAction
+	activeItem     *provider.ConfigItem
+	configStatus   string
 
 	// Preview state.
 	previewTranscript []provider.TranscriptMessage
@@ -66,23 +66,23 @@ type Model struct {
 	useColor bool
 
 	// Result.
-	result  *provider.PickResult
+	result   *provider.PickResult
 	quitting bool
 }
 
 // NewModel creates a new picker model.
 func NewModel(p provider.Provider, sessions []provider.Session, cwd, permissionMode string, width, height int, useColor bool) Model {
 	return Model{
-		provider:       p,
-		sessions:       sessions,
-		view:           ViewSessions,
+		provider:             p,
+		sessions:             sessions,
+		view:                 ViewSessions,
 		sessionSelectedIndex: 1,
-		permissionMode: session.NormalizePermissionMode(permissionMode, p.PermissionModes()),
-		cwd:            cwd,
-		width:          width,
-		height:         height,
-		useColor:       useColor,
-		configActions:  p.ConfigurationActions(),
+		permissionMode:       session.NormalizePermissionMode(permissionMode, p.PermissionModes()),
+		cwd:                  cwd,
+		width:                width,
+		height:               height,
+		useColor:             useColor,
+		configActions:        p.ConfigurationActions(),
 	}
 }
 
@@ -435,6 +435,24 @@ func (m Model) selectConfiguration() (tea.Model, tea.Cmd) {
 	action := m.configActions[idx]
 	m.activeAction = &action
 	m.configItemSelectedIndex = 0
+
+	// Direct multiselect actions skip the intermediate item list.
+	if action.Mode == "multiselect" && action.DirectItem != nil && action.LoadSubitems != nil {
+		item := *action.DirectItem
+		m.activeItem = &item
+		ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
+		subitems, err := action.LoadSubitems(item, ctx)
+		if err != nil {
+			m.configSubitems = nil
+			m.configStatus = err.Error()
+		} else {
+			m.configSubitems = subitems
+			m.configStatus = ""
+		}
+		m.view = ViewConfigurationSubitems
+		return m, nil
+	}
+
 	if action.LoadItems != nil {
 		ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
 		items, err := action.LoadItems(ctx)
@@ -747,7 +765,7 @@ func (m Model) renderWorkspaces() string {
 		"",
 	}
 
-	maxItemRows := max(1, m.height - 5)
+	maxItemRows := max(1, m.height-5)
 	start := max(0, min(idx-maxItemRows+1, len(items)-maxItemRows))
 	visibleItems := items[start:min(start+maxItemRows, len(items))]
 
@@ -814,8 +832,8 @@ func (m Model) renderConfigurations() string {
 
 	// Pre-compute all action columns to determine alignment widths.
 	type actionRow struct {
-		action     provider.ConfigAction
-		colTexts   []string
+		action   provider.ConfigAction
+		colTexts []string
 	}
 	rows := make([]actionRow, len(items))
 
