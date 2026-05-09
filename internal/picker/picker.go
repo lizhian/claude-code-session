@@ -111,7 +111,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case terminalPreviewReadyMsg:
 		if m.view == ViewTerminalPreview {
-			printTerminalText("\x1b[H\x1b[2J")
+			printTerminalText(clearTerminalAndScrollback)
 			items := m.currentSessionItems()
 			idx := render.ClampSelectedIndex(m.sessionSelectedIndex, len(items))
 			if idx < len(items) && items[idx].Type == "session" && items[idx].Session != nil {
@@ -241,7 +241,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) closeTerminalPreview() (tea.Model, tea.Cmd) {
-	printTerminalText("\x1b[H\x1b[2J")
+	printTerminalText(clearTerminalAndScrollback)
 	m.view = ViewSessions
 	m.previewTranscript = nil
 	m.previewError = ""
@@ -824,6 +824,8 @@ func (m Model) renderSessions() string {
 
 	return strings.Join(lines, "\n")
 }
+
+const clearTerminalAndScrollback = "\x1b[H\x1b[2J\x1b[3J"
 
 func printTerminalPreview() tea.Cmd {
 	return func() tea.Msg {
