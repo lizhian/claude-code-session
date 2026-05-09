@@ -312,9 +312,7 @@ func loadProviderModels(providerName string) ([]provider.ConfigItem, error) {
 		seen[n] = true
 	}
 
-	sort.SliceStable(allNames, func(i, j int) bool {
-		return strings.ToLower(allNames[i]) < strings.ToLower(allNames[j])
-	})
+	sortModelNames(allNames)
 
 	items := make([]provider.ConfigItem, len(allNames))
 	for i, name := range allNames {
@@ -443,8 +441,8 @@ func loadConfiguredModelChoices(fieldName string) ([]provider.ConfigItem, error)
 			})
 		}
 	}
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].Name < items[j].Name
+	sort.SliceStable(items, func(i, j int) bool {
+		return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
 	})
 	return items, nil
 }
@@ -457,6 +455,12 @@ func loadConfiguredModelValue(fieldName string) string {
 	}
 	val, _ := config[fieldName].(string)
 	return val
+}
+
+func sortModelNames(names []string) {
+	sort.SliceStable(names, func(i, j int) bool {
+		return strings.ToLower(names[i]) < strings.ToLower(names[j])
+	})
 }
 
 // saveConfiguredModel sets a model field in the config.

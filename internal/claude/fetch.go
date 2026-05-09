@@ -81,7 +81,7 @@ func FetchClaudeModelNames(provider map[string]interface{}, timeoutMs int) ([]st
 			unique = append(unique, n)
 		}
 	}
-	sort.Strings(unique)
+	sortModelNames(unique)
 	return unique, nil
 }
 
@@ -132,7 +132,7 @@ func LoadClaudeModelChoices(fieldName, claudeHome string) ([]provider.ConfigItem
 			nameSet[n] = true
 		}
 	}
-	sort.Strings(allNames)
+	sortModelNames(allNames)
 
 	items := make([]provider.ConfigItem, len(allNames))
 	for i, name := range allNames {
@@ -140,8 +140,19 @@ func LoadClaudeModelChoices(fieldName, claudeHome string) ([]provider.ConfigItem
 			Name:     name,
 			Label:    name,
 			Selected: name == currentValue,
-			Columns:  []provider.ConfigColumn{{Value: func() string { if name == currentValue { return "selected" }; return "" }()}},
+			Columns: []provider.ConfigColumn{{Value: func() string {
+				if name == currentValue {
+					return "selected"
+				}
+				return ""
+			}()}},
 		}
 	}
 	return items, nil
+}
+
+func sortModelNames(names []string) {
+	sort.SliceStable(names, func(i, j int) bool {
+		return strings.ToLower(names[i]) < strings.ToLower(names[j])
+	})
 }
