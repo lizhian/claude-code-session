@@ -135,9 +135,9 @@ $PathBlock = @"
 # agent-session BEGIN
 `$env:PATH = "$EscapedInstallDir;`$env:PATH"
 
-function cc { & "$EscapedInstallDir\agent-session.exe" cc --pick --trust-current-folder @args }
-function cx { & "$EscapedInstallDir\agent-session.exe" cx --pick --trust-current-folder @args }
-function oc { & "$EscapedInstallDir\agent-session.exe" oc --pick --trust-current-folder @args }
+function cc { & "$EscapedInstallDir\agent-session.exe" cc @args }
+function cx { & "$EscapedInstallDir\agent-session.exe" cx @args }
+function oc { & "$EscapedInstallDir\agent-session.exe" oc @args }
 # agent-session END
 "@
 

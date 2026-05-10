@@ -218,7 +218,7 @@ func formatSessions(sessions []provider.Session, providerName string) string {
 	if len(sessions) == 0 {
 		return "当前目录没有找到 " + providerName + " session。"
 	}
-	// TODO: port full table formatting from session-renderer.js
+	// TODO: route this legacy helper through internal/render if text output is reintroduced.
 	return ""
 }
 
@@ -228,7 +228,7 @@ func FormatPicker(sessions []provider.Session) string {
 }
 
 func formatPicker(sessions []provider.Session) string {
-	// TODO: port full picker formatting from session-renderer.js
+	// TODO: route this legacy helper through internal/render if non-interactive picking is reintroduced.
 	return ""
 }
 

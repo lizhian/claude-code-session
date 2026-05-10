@@ -1,116 +1,130 @@
 # Agent Session
 
-[中文](README.zh-CN.md) | English
+Claude Code、Codex 与 OpenCode 的交互式 session 选择器。一个 Go 二进制文件通过不同命令名分发：`cc` 打开 Claude Code，`cx` 打开 Codex，`oc` 打开 OpenCode。
 
-Interactive session pickers for Claude Code, Codex, and OpenCode. Single binary, zero runtime dependencies.
+- `cc`：浏览并恢复 Claude Code sessions
+- `cx`：浏览并恢复 Codex sessions
+- `oc`：浏览并恢复 OpenCode sessions
 
-- `cc` — Claude Code sessions
-- `cx` — Codex sessions
-- `oc` — OpenCode sessions
+## 功能
 
-## Features
+- 浏览当前目录下的 Claude Code、Codex、OpenCode sessions。
+- 从 `0. new` 新建 session，或选择已有 session 恢复。
+- 按首条/末条 user 消息、路径、时间等信息搜索 sessions。
+- 显示短 session ID、相对更新时间、消息数量、首条/末条 user 消息。
+- 使用 `Tab` 切换权限模式，并记住上次选择。
+- 通过工作区视图切换到其他项目目录。
+- 在选择器内配置模型 provider、默认模型和 provider 相关模型列表。
+- 单二进制 + 命令分发：`cc`/`cx`/`oc` -> `agent-session`。
+- 零运行时依赖：运行时不需要 Node.js、sqlite3 或 Go。
 
-- List Claude Code, Codex, and OpenCode sessions for the current directory.
-- Start a new session or resume an existing session.
-- Search sessions interactively with a fixed-column status line.
-- Navigate with arrow keys.
-- Show short session IDs, relative update time, message counts, first/last user messages.
-- Switch between permission modes (Tab).
-- Remember the last selected permission mode.
-- Browse workspaces with the right arrow key.
-- Configure model providers, default models, and provider-specific settings.
-- Single binary with symlink dispatch: `cc`/`cx`/`oc` → `agent-session`.
-- Zero runtime dependencies — no Node.js, no sqlite3, no Go needed at runtime.
+## 安装
 
-## Install
-
-macOS/Linux:
+macOS/Linux：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/lizhian/agent-session/main/install.sh | sh
 ```
 
-Windows PowerShell:
+Windows PowerShell：
 
 ```powershell
 irm https://raw.githubusercontent.com/lizhian/agent-session/main/install.ps1 | iex
 ```
 
-The installer downloads a pre-compiled binary from GitHub Releases, creates `cc`/`cx`/`oc` symlinks (hardlinks on Windows), and adds the install directory to your PATH.
+安装脚本会从 GitHub Releases 下载预编译二进制，创建 `cc`、`cx`、`oc` 命令，并把安装目录加入 PATH。脚本会检查本机是否已安装对应 agent CLI；如果缺少 `claude`、`codex` 或 `opencode`，安装时会给出提示，实际运行对应命令前仍需要先安装原始 agent CLI。
 
-After installing, reload your shell:
+安装后重新加载 shell：
 
 ```bash
-source ~/.zshrc    # or source ~/.bashrc
+source ~/.zshrc    # 或 source ~/.bashrc
 ```
 
-On Windows, restart PowerShell or run:
+Windows 下重启 PowerShell，或执行：
 
 ```powershell
 . $PROFILE
 ```
 
-## Usage
+## 使用
 
 ```bash
-cc              # Claude Code sessions
-cx              # Codex sessions
-oc              # OpenCode sessions
+cc              # 打开 Claude Code session 选择器
+cx              # 打开 Codex session 选择器
+oc              # 打开 OpenCode session 选择器
 ```
 
-Interactive controls:
-
-- Type to search.
-- Up/down arrows move the selection.
-- Enter opens the selected session or workspace.
-- `Tab` switches permission mode.
-- Right arrow opens workspace selection.
-- Left arrow returns to the previous view.
-- `Esc` or `Ctrl-C` cancels.
-
-Picker numbering starts at `0`: choose `0` for a new session; choose `1+` to resume an existing session.
-
-Permission modes:
-
-| Mode    | Claude                                          | Codex                                               | OpenCode                          |
-|---------|-------------------------------------------------|-----------------------------------------------------|-----------------------------------|
-| Default | `claude`                                        | `codex`                                             | `opencode`                        |
-| Auto    | `claude --enable-auto-mode`                     | `codex --full-auto`                                 | —                                 |
-| Full    | `claude --dangerously-skip-permissions`         | `codex --dangerously-bypass-approvals-and-sandbox`  | `OPENCODE_PERMISSION="allow"`     |
-
-## CLI
+也可以直接通过主二进制分发：
 
 ```bash
-cc [--json | --pick] [--cwd <path>] [--claude-home <path>]
-cx [--json | --pick] [--cwd <path>] [--codex-home <path>]
-oc [--json | --pick] [--cwd <path>] [--opencode-data-home <path>]
+agent-session cc
+agent-session cx
+agent-session oc
 ```
 
-Options:
+选择器编号从 `0` 开始：选择 `0` 新建 session，选择 `1+` 恢复已有 session。
 
-- `--json`: output JSON for scripting.
-- `--pick`: open the interactive picker.
-- `--trust-current-folder`: mark current folder as trusted.
-- `--cwd <path>`: list sessions for a specific directory.
-- `--claude-home <path>`: Claude config directory (default `~/.claude`).
-- `--codex-home <path>`: Codex config directory (default `~/.codex`).
-- `--opencode-data-home <path>`: OpenCode data directory (default `~/.local/share/opencode`).
+### 交互操作
 
-## Project Structure
+- 输入文字：搜索当前视图。
+- `Up`/`Down` 或 `k`/`j`：移动选择。
+- `Enter`：打开选中的 session、工作区或配置项。
+- `Space`：在 session 列表中预览 transcript；在多选配置中切换选中状态。
+- `Tab`：在 session 列表中切换权限模式。
+- `Right` 或 `l`：从 session 列表进入工作区视图；从工作区视图进入配置视图。
+- `Left` 或 `h`：返回上一层。
+- `Esc`：返回上一层；在 session 列表中退出。
+- `Ctrl-C`：退出。
 
+### 权限模式
+
+| 模式 | Claude Code | Codex | OpenCode |
+| --- | --- | --- | --- |
+| 默认 | `claude` | `codex` | `opencode` |
+| 自动 | `claude --enable-auto-mode` | `codex --full-auto` | 不支持 |
+| 完全 | `claude --dangerously-skip-permissions` | `codex --dangerously-bypass-approvals-and-sandbox` | `OPENCODE_PERMISSION="allow" opencode` |
+
+Claude Code 和 Codex 支持默认、自动、完全三种模式；OpenCode 目前只支持默认和完全模式。
+
+### 命令参数
+
+```bash
+cc [--cwd <path>] [--claude-home <path>]
+cx [--cwd <path>] [--codex-home <path>]
+oc [--cwd <path>] [--opencode-data-home <path>]
 ```
-cmd/agent-session/main.go     # Binary entry point, symlink dispatch
+
+参数：
+
+- `--cwd <path>`：指定要浏览 sessions 的项目目录，默认是当前目录。
+- `--claude-home <path>`：Claude Code 配置目录，默认读取 `CLAUDE_HOME`，否则使用 `~/.claude`。
+- `--codex-home <path>`：Codex 配置目录，默认读取 `CODEX_HOME`，否则使用 `~/.codex`。
+- `--opencode-data-home <path>`：OpenCode 数据目录，默认读取 `OPENCODE_DATA_HOME`，否则使用 `~/.local/share/opencode`。
+- `-h`/`--help`：显示帮助。
+
+## 配置视图
+
+在 session 列表中按 `Right` 进入工作区视图，再按 `Right` 进入配置视图。
+
+- Claude Code：切换 model provider，并配置 Opus、Sonnet、Haiku 模型。
+- Codex：切换 `config.toml` 中的 model provider；切换后会尝试通过 `codex-threadripper` 同步 threads，如果该命令不存在则跳过同步。
+- OpenCode：配置 provider 可用模型、默认模型和 small model。
+
+## 项目结构
+
+```text
+cmd/agent-session/main.go     # 二进制入口，按命令名分发到 provider
 internal/
-  provider/                   # Provider interface
-  claude/                     # Claude Code provider (JSONL, settings.json)
-  codex/                      # Codex provider (JSONL, config.toml, thread sync)
-  opencode/                   # OpenCode provider (SQLite, JSONC config)
-  picker/                     # bubbletea TUI, 6-view state machine
-  render/                     # ANSI, CJK width, formatting
-  session/                    # JSONL parser, config, permission, runner, transcript
+  provider/                   # 三个 provider 共享的接口
+  claude/                     # Claude Code provider：JSONL、settings.json、模型 provider
+  codex/                      # Codex provider：JSONL、config.toml、thread 同步
+  opencode/                   # OpenCode provider：SQLite、JSONC 配置、模型 provider
+  picker/                     # bubbletea TUI，多视图状态机
+  render/                     # ANSI 样式、CJK 宽度、表格格式化
+  session/                    # JSONL 解析、配置读写、权限模式、命令运行、transcript
 ```
 
-## Development
+## 开发
 
 ```bash
 go test ./...
@@ -118,13 +132,21 @@ go vet ./...
 go build -ldflags="-s -w" -o agent-session ./cmd/agent-session/
 ```
 
-## Release
+本地运行：
 
-Push a tag to trigger the CI pipeline:
+```bash
+./agent-session cc
+./agent-session cx
+./agent-session oc
+```
+
+## 发布
+
+推送 `v*` tag 会触发 GitHub Actions release pipeline：
 
 ```bash
 git tag v0.0.1
 git push origin --tags
 ```
 
-GitHub Actions cross-compiles for darwin-arm64, darwin-amd64, linux-amd64, linux-arm64, and windows-amd64, then creates a release with binaries and checksums.
+CI 会交叉编译 darwin-arm64、darwin-amd64、linux-amd64、linux-arm64、windows-amd64，并创建包含二进制和 `checksums.txt` 的 GitHub Release。

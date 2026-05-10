@@ -1,201 +1,178 @@
 # Agent Session
 
-Agent Session is a small CLI toolkit for listing, filtering, and reopening local sessions created by different coding agents.
+Agent Session is a Go CLI for finding, filtering, configuring, and reopening local sessions created by Claude Code, Codex, and OpenCode.
 
 ## Language
 
 **Agent provider**:
-A supported coding-agent product whose local session history can be browsed by this project.
+A supported coding-agent product whose local sessions can be browsed and reopened by Agent Session.
 _Avoid_: Agent, backend
+
+**Dispatcher binary**:
+The single `agent-session` executable that selects an **Agent provider** from either its invoked command name or its first subcommand.
+_Avoid_: Provider CLI, provider script
+
+**Public command**:
+The user-facing command name that launches one **Agent provider** through the **Dispatcher binary**.
+_Avoid_: Alias, internal command
+
+**Provider implementation**:
+The provider-specific code that discovers sessions, loads transcripts, builds launch commands, and exposes configuration actions for one **Agent provider**.
+_Avoid_: Provider CLI, agent file
+
+**Provider interface**:
+The shared contract implemented by every **Provider implementation**.
+_Avoid_: Abstract provider, generic backend
+
+**Common support module**:
+Shared code used by multiple **Provider implementations** for picker state, config handling, rendering, JSONL parsing, permissions, or command launching.
+_Avoid_: Provider code
+
+**Session**:
+A local conversation record created by an **Agent provider** for a project directory.
+_Avoid_: Chat, transcript file
+
+**Workspace**:
+A project directory that has one or more **Sessions** for an **Agent provider**.
+_Avoid_: Folder list, project row
+
+**Session picker**:
+The interactive TUI used to search **Sessions**, switch **Workspaces**, open configuration actions, preview transcripts, and choose what to launch.
+_Avoid_: Menu, prompt
+
+**Picker view**:
+A navigable screen inside the **Session picker**.
+_Avoid_: Page, mode
+
+**Configurations view**:
+A **Picker view** for provider-specific actions that change the selected **Agent provider** configuration.
+_Avoid_: Settings screen, right-click menu
+
+**Configuration action**:
+A selectable operation in the **Configurations view**, such as choosing a **Model provider** or editing model selections.
+_Avoid_: Setting row
+
+**Configuration item**:
+A selectable choice presented by a **Configuration action**.
+_Avoid_: Option row
+
+**Multi-select configuration list**:
+A **Picker view** where multiple **Configuration items** can be toggled before saving.
+_Avoid_: Session list
 
 **Model provider**:
 A selectable model backend configuration inside an **Agent provider**.
 _Avoid_: Provider
 
 **Model provider selection state**:
-A top-level provider config state that records the current **Model provider** in `model_provider_selected` when the **Agent provider** supports that field.
+Provider config state that records the current **Model provider** when the **Agent provider** supports that concept.
 _Avoid_: Default provider inference
 
+**Permission mode**:
+A launch-safety level selected before starting or resuming a **Session**.
+_Avoid_: Install mode, trust mode
+
 **Permission mode selection state**:
-A top-level provider config state that records the current permission mode in `permission_mode_selected`.
+Provider config state that records the last selected **Permission mode** for an **Agent provider**.
 _Avoid_: Install config
 
-**Provider CLI**:
-The command-line entry point and provider-specific session parser for one **Agent provider**.
-_Avoid_: Agent file, provider script
-
-**Public command**:
-The user-facing command or alias that launches a **Provider CLI**.
-_Avoid_: Internal file path
-
-**Public command runner**:
-A **Common support module** that executes the shared lifecycle of a **Public command** after provider-specific argument parsing.
-_Avoid_: Provider main, CLI runner
-
-**Common support module**:
-A shared module used by multiple **Provider CLIs** for picker state, config, formatting, JSONL parsing, or command launching.
-_Avoid_: Provider code
-
-**Session renderer**:
-A **Common support module** that formats session lists, workspace lists, and interactive picker output without owning provider-specific session discovery.
-_Avoid_: Claude renderer
-
-**Session preview**:
-A temporary picker view for reading the selected session's **Conversation transcript** before reopening it.
-_Avoid_: Editor-like transcript browser
-
-**Configurations page**:
-A picker view for actions that change provider-specific configuration for the selected **Agent provider**.
-_Avoid_: Settings screen, right-click menu
-
-**Multi-select configuration list**:
-A **Configurations page** subview where multiple configuration choices can be toggled before saving.
-_Avoid_: Session list
-
 **Provider-managed environment**:
-Environment fields inside an **Agent provider** config that belong to the selected **Model provider**.
+Environment fields inside a Claude Code **Agent provider** config that belong to the selected **Model provider**.
 _Avoid_: All env fields
 
 **Conversation transcript**:
-Provider-loaded chronological useful dialogue messages for one session, including user messages and assistant replies.
+Provider-loaded chronological user and assistant dialogue for one **Session**, excluding tool noise and internal events.
 _Avoid_: Session summary, user-only transcript
+
+**Session preview**:
+A temporary **Picker view** for reading the selected **Session**'s **Conversation transcript** before reopening it.
+_Avoid_: Editor-like transcript browser
 
 **Conversation message preview**:
 A length-limited rendering of one **Conversation transcript** message body.
 _Avoid_: Full message dump
 
-**Source layout**:
-The repository directory structure that separates **Provider CLIs** into provider folders and shared scripts into `common/`.
-_Avoid_: Root CLI files
-
-**Install layout**:
-The copied file structure under the local install directory that mirrors the **Source layout**.
-_Avoid_: Flattened install files
+**Trust state**:
+Provider-native project configuration that marks a project directory as trusted before launching an agent.
+_Avoid_: Permission mode
 
 ## Relationships
 
-- A **Provider CLI** belongs to exactly one **Agent provider**.
-- An **Agent provider** may expose one or more **Model providers**.
-- **Model provider selection state** is authoritative for Agent providers that support `model_provider_selected`.
-- **Permission mode selection state** is stored in each **Agent provider**'s native config, not under the **Install layout**.
-- Codex **Model provider selection state** is authoritative before Codex's native `model_provider` field.
-- Claude Code **Model provider selection state** is authoritative before copying the selected provider's environment into `env`.
-- Claude Code **Model provider** switching updates only the **Provider-managed environment** and preserves unrelated global `env` fields.
-- Claude Code **Model provider** model choices are discovered from the selected provider's `GET /v1/models` endpoint.
-- Claude Code **Model provider** model discovery uses the selected provider's `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`, not fallback `env` values.
-- Claude Code Haiku, Opus, and Sonnet model settings use the same discovered model list without automatic name-based filtering.
-- Claude Code **Model provider** switching backs up current **Provider-managed environment** fields into the previously selected provider before applying the new provider.
-- Claude Code model setting changes require a valid **Model provider selection state**.
-- Claude Code **Configurations page** exposes `Model provider`, `Opus model`, `Sonnet model`, and `Haiku model` actions in that order.
-- OpenCode **Model providers** backed by `@ai-sdk/*` packages may refresh their configured model list from `options.baseURL`.
-- A **Public command** points at exactly one **Provider CLI**.
-- A **Provider CLI** may delegate **Public command** lifecycle behavior to a **Public command runner**.
-- A **Common support module** may be used by multiple **Provider CLIs**.
-- **Provider CLIs** keep provider-specific behavior separate from **Common support modules**.
-- A **Session renderer** may be used by any **Provider CLI**.
-- A **Session preview** belongs to the session picker and loads a **Conversation transcript** lazily.
+- A **Public command** names exactly one **Agent provider**: `cc` names Claude Code, `cx` names Codex, and `oc` names OpenCode.
+- The **Dispatcher binary** may be invoked as `cc`, `cx`, or `oc`, or as `agent-session cc`, `agent-session cx`, or `agent-session oc`.
+- A **Provider implementation** belongs to exactly one **Agent provider**.
+- Every **Provider implementation** implements the **Provider interface**.
+- **Provider implementations** own provider-specific session discovery because Claude Code, Codex, and OpenCode store **Sessions** differently.
+- **Common support modules** must not own provider-specific storage rules.
+- A **Workspace** contains zero or more currently matching **Sessions** for one **Agent provider**.
+- A **Session picker** starts in the session list and can navigate to **Workspaces**, the **Configurations view**, and **Session preview**.
+- A **Session preview** loads a **Conversation transcript** lazily for the selected **Session**.
+- A **Conversation transcript** includes useful user and assistant messages, not tool calls or internal records.
 - A **Conversation message preview** limits one message body to 500 non-whitespace Unicode runes by keeping the first 250 and last 250 non-whitespace runes while preserving original whitespace.
-- A **Configurations page** is reached from a workspace list and belongs to the current **Agent provider**.
-- A **Multi-select configuration list** uses blue for selected choices and cyan only for the current unselected cursor row.
-- **Provider CLIs** own **Conversation transcript** loading because session storage differs by **Agent provider**.
-- A **Session renderer** owns **Conversation transcript** display; terminal scrollback owns long-preview scrolling.
-- The **Install layout** mirrors the **Source layout** so relative imports stay the same after installation.
-- Tests may remain at the repository root while importing provider modules from the **Source layout**.
+- A **Configurations view** belongs to the current **Agent provider**.
+- A **Configuration action** may show direct **Configuration items** or a **Multi-select configuration list**.
+- Claude Code and Codex expose **Model provider** selection as a **Configuration action**.
+- OpenCode exposes `@ai-sdk/*` provider model lists, default model, and small model as **Configuration actions**.
+- **Model provider selection state** is authoritative before fallback native model-provider fields when an **Agent provider** supports both.
+- Codex **Model provider selection state** uses top-level `model_provider_selected`, falling back to native `model_provider` only when no selected provider is recorded.
+- Claude Code **Model provider selection state** uses `model_provider_selected`; the selected provider's fields are copied into `env`.
+- Claude Code **Model provider** switching backs up current **Provider-managed environment** fields into the previously selected provider before applying the new provider.
+- Claude Code **Model provider** switching updates only the **Provider-managed environment** and preserves unrelated global `env` fields.
+- Claude Code model setting changes require a valid **Model provider selection state**.
+- Claude Code **Model provider** model choices are discovered from the selected provider's `GET /v1/models` endpoint.
+- Claude Code model discovery uses the selected **Model provider**'s own `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`, not fallback `env` values.
+- Claude Code Haiku, Opus, and Sonnet model settings use the same discovered model list without automatic name-based filtering.
+- Codex **Model provider** switching backs up current `auth.json` into the previously selected provider before writing the target provider's auth.
+- Codex **Model provider** switching may attempt thread sync through `codex-threadripper`; missing `codex-threadripper` means sync is skipped, not failed.
+- OpenCode can read JSONC-style config but writes standard formatted JSON.
+- OpenCode **Permission mode selection state** uses native `permission`, and legacy `permission_mode_selected` is migrated away.
+- Claude Code and Codex support default, auto, and full **Permission modes**.
+- OpenCode supports default and full **Permission modes** only.
+- Claude Code and Codex update **Trust state** before launching; OpenCode has no Agent Session-managed **Trust state**.
 
 ## Example dialogue
 
-> **Dev:** "If we move `claude-sessions.js` under `claude/`, should the `cc` alias change?"
-> **Domain expert:** "No. `cc` is a **Public command**. The file move only changes the internal **Provider CLI** path."
+> **Dev:** "If the user runs `agent-session cx`, is `cx` a separate binary?"
+> **Domain expert:** "No. `cx` is a **Public command** handled by the same **Dispatcher binary**. It selects the Codex **Agent provider**."
 
-> **Dev:** "When Codex switches from OpenAI to another configured backend, is that a new **Agent provider**?"
-> **Domain expert:** "No. Codex remains the **Agent provider**; the selected backend is a **Model provider**."
+> **Dev:** "Should a provider package parse another provider's session files?"
+> **Domain expert:** "No. A **Provider implementation** owns only its own **Agent provider** storage rules and shares only generic behavior through **Common support modules**."
 
-> **Dev:** "Should the Claude **Provider CLI** own JSON output and fallback prompt flow?"
-> **Domain expert:** "No. Those are shared **Public command** lifecycle behaviours and belong in the **Public command runner**."
+> **Dev:** "When the user presses Right from the session list, do we open model settings immediately?"
+> **Domain expert:** "No. The **Session picker** first opens **Workspaces**; pressing Right again opens the **Configurations view** for the current **Agent provider**."
 
-> **Dev:** "Can Codex reuse the Claude picker renderer?"
-> **Domain expert:** "It can reuse the same **Session renderer**, but that renderer must live under `common/`, not inside the Claude **Provider CLI**."
+> **Dev:** "Does pressing Space load every transcript upfront?"
+> **Domain expert:** "No. Space opens a **Session preview** and lazily loads the selected **Session**'s **Conversation transcript**."
 
-> **Dev:** "Should installed files be flattened into one directory?"
-> **Domain expert:** "No. The **Install layout** mirrors the **Source layout** so `common/`, `claude/`, `codex/`, and `opencode/` exist in both places."
+> **Dev:** "Should the **Conversation transcript** include tool output?"
+> **Domain expert:** "No. It includes useful user and assistant dialogue, excluding tool noise and internal events."
 
-> **Dev:** "Does pressing Space load every session transcript upfront?"
-> **Domain expert:** "No. Space opens a **Session preview** and lazily loads the selected session's **Conversation transcript**."
-
-> **Dev:** "In the workspace list, does Enter open configuration actions?"
-> **Domain expert:** "No. Enter opens the selected workspace's sessions; the right arrow opens the **Configurations page**."
-
-> **Dev:** "Should Codex model backend switching stay as a separate command?"
-> **Domain expert:** "No. It belongs in the Codex **Configurations page** as **Model provider** selection."
-
-> **Dev:** "If Codex has no `model_provider_selected` and no native `model_provider`, should we infer the provider without `base_url`?"
-> **Domain expert:** "No. Create an `unknown-YYYYMMDD-HHmmss` **Model provider** with `name` and the current `auth_json`, then switch."
-
-> **Dev:** "When switching Codex **Model providers**, can we replace `auth.json` immediately?"
-> **Domain expert:** "No. First back up the current `auth.json` into the previously selected provider's `auth_json`; only then write the target provider's auth."
-
-> **Dev:** "Should permission mode still be saved under `~/.agent-session`?"
-> **Domain expert:** "No. It is **Permission mode selection state** and belongs in each **Agent provider**'s native config. Claude and Codex use `permission_mode_selected`; OpenCode must use its native `permission` field because its config schema rejects unknown top-level keys."
-
-> **Dev:** "Is `model_provider_selected` only a Codex concept?"
-> **Domain expert:** "No. It is **Model provider selection state** for any **Agent provider** that supports the field; Codex and Claude Code both use it, while OpenCode currently does not."
-
-> **Dev:** "When switching Claude Code **Model providers**, should every `env` field be replaced?"
+> **Dev:** "When switching Claude Code **Model providers**, can we replace the whole `env` map?"
 > **Domain expert:** "No. Only the **Provider-managed environment** is copied from the selected **Model provider**; unrelated global `env` fields stay unchanged."
 
-> **Dev:** "Should Claude Code model choices be typed manually?"
-> **Domain expert:** "No. Fetch model choices from the selected **Model provider** using `GET /v1/models`."
-
-> **Dev:** "If the selected Claude Code **Model provider** is missing base URL or token, should discovery use `env` as fallback?"
-> **Domain expert:** "No. Model discovery belongs to the selected **Model provider** and must use that provider's own `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`."
-
-> **Dev:** "Should Claude Code Haiku, Opus, and Sonnet model pickers filter the discovered list by model name?"
-> **Domain expert:** "No. They share the same discovered model list because third-party **Model provider** names may use aliases that do not contain Haiku, Opus, or Sonnet."
-
-> **Dev:** "Should Claude Code copy current `env` provider fields back before switching **Model providers**?"
-> **Domain expert:** "Yes. Back up the current **Provider-managed environment** into the previously selected **Model provider**, then copy the target provider into `env` and update **Model provider selection state**."
-
-> **Dev:** "If Claude Code has no valid selected **Model provider**, should model setting changes guess one?"
+> **Dev:** "If Claude Code has no selected **Model provider**, should model setting changes guess one?"
 > **Domain expert:** "No. First select a **Model provider**; model setting changes must update `env` and the selected provider together."
 
-> **Dev:** "Should Claude Code call the three model actions `Default model` variants?"
-> **Domain expert:** "No. Use `Haiku model`, `Opus model`, and `Sonnet model` so the actions map directly to Claude Code environment fields."
+> **Dev:** "If a third-party Claude model ID does not contain Haiku, Opus, or Sonnet, should the picker hide it?"
+> **Domain expert:** "No. Claude Code Haiku, Opus, and Sonnet actions share the discovered model list because third-party **Model providers** often use aliases."
 
-> **Dev:** "Should Claude Code show the current default model beside each model action?"
-> **Domain expert:** "Yes. The **Configurations page** should show the current Opus, Sonnet, and Haiku model values in columns beside their actions."
+> **Dev:** "When switching Codex **Model providers**, can we replace `auth.json` immediately?"
+> **Domain expert:** "No. First back up the current `auth.json` into the previously selected provider, then write the target provider's auth."
 
-> **Dev:** "Should OpenCode preserve comments and trailing commas when updating provider models?"
-> **Domain expert:** "No. It may read JSONC-style config but writes standard formatted JSON."
+> **Dev:** "If `codex-threadripper` is not installed, did Codex provider switching fail?"
+> **Domain expert:** "No. Missing `codex-threadripper` means thread sync is skipped after the **Model provider** switch."
 
-> **Dev:** "In a **Multi-select configuration list**, should the current cursor color override a selected choice?"
-> **Domain expert:** "No. Selected choices stay blue; cyan is only the cursor color for unselected choices."
-
-> **Dev:** "How does OpenCode discover models for an `@ai-sdk/*` provider?"
-> **Domain expert:** "It calls `GET {options.baseURL}/models` with `Authorization: Bearer {options.apiKey}`, then writes selected IDs to `provider.<name>.models`."
-
-> **Dev:** "How does OpenCode choose its default models?"
-> **Domain expert:** "The OpenCode **Configurations page** selects from configured `provider.<name>.models` values and writes top-level `model` or `small_model` as `provider/model`."
-
-> **Dev:** "Should the **Session preview** show assistant replies too?"
-> **Domain expert:** "Yes. A **Conversation transcript** includes useful user messages and assistant replies, while excluding tool noise and internal events."
-
-> **Dev:** "If one assistant reply is very long, does the **Session preview** print it in full?"
-> **Domain expert:** "No. It uses a **Conversation message preview** that keeps the first 250 and last 250 non-whitespace Unicode runes, preserves original whitespace, and inserts a body-colored truncation marker block between them."
+> **Dev:** "Should OpenCode store Agent Session's last permission choice in `permission_mode_selected`?"
+> **Domain expert:** "No. OpenCode **Permission mode selection state** uses native `permission`; legacy `permission_mode_selected` is migrated away."
 
 ## Flagged ambiguities
 
-- "agent file" is resolved as **Provider CLI** when it refers to the Claude, Codex, or OpenCode executable module.
 - "provider" is resolved as **Model provider** when it refers to a selectable backend inside an **Agent provider**.
-- "current Codex provider" is resolved through `model_provider_selected`, then native `model_provider`; never by inferring the provider without `base_url`.
-- "current Claude Code provider" is resolved through `model_provider_selected`; the selected provider's fields are copied into `env`.
-- "Claude unknown provider" is not introduced for missing **Model provider selection state**; Claude Code can directly select a configured provider and set `model_provider_selected`.
-- "CLI runner" is resolved as **Public command runner** when it refers to shared command lifecycle behavior.
-- "right key" is resolved as the keyboard right-arrow navigation from session list to workspace list, or from workspace list to **Configurations page**.
-- "codexuse" is resolved as the legacy standalone Codex **Model provider** switcher; the resolved flow is the Codex **Configurations page**.
-- "OpenCode provider models" is resolved as the OpenCode **Configurations page** action that edits `~/.config/opencode/opencode.json` `provider.<name>.models`.
-- "OpenCode default model" is resolved as the top-level `model` or `small_model` fields in `~/.config/opencode/opencode.json`, not provider model discovery.
-- "Claude renderer" is resolved as **Session renderer** once the formatting logic is shared by Codex and OpenCode.
-- "root files" is resolved as the legacy layout where Provider CLIs lived at the repository root; the resolved **Source layout** no longer keeps root Provider CLI files.
-- "preview messages" is resolved as **Session preview** backed by a lazily-loaded **Conversation transcript**, not the already-loaded session summary.
-- "complete conversation messages" is resolved as useful user and assistant dialogue messages inside the **Conversation transcript**, not tool calls or internal events.
-- "Session transcript" formerly meant a user-only preview transcript; resolved as **Conversation transcript** when discussing preview contents.
+- "agent" is resolved as **Agent provider** when it refers to Claude Code, Codex, or OpenCode.
+- "CLI" is resolved as **Dispatcher binary** when discussing `agent-session` itself, and **Public command** when discussing `cc`, `cx`, or `oc`.
+- "Provider CLI" is a retired term from the old multi-script layout; use **Provider implementation** for provider-specific Go packages.
+- "alias" is resolved as **Public command** unless the discussion is specifically about shell function installation.
+- "settings" is resolved as **Configurations view** when discussing the picker screen.
+- "Session transcript" is resolved as **Conversation transcript** when discussing preview contents.
+- "preview messages" is resolved as **Session preview** backed by a lazily loaded **Conversation transcript**, not the already loaded session summary.
+- "trust" is resolved as **Trust state** when marking a project directory trusted, and as **Permission mode** only when discussing launch-safety levels.
