@@ -99,24 +99,25 @@ func (p *ClaudeProvider) ConfigurationActions() []provider.ConfigAction {
 				val := currentClaudeModelColumn(ModelFields[field], ctx.DataHome)
 				return []provider.ConfigColumn{{Name: "model", Value: strings.Join(val, "")}}
 			},
-			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
-				return LoadClaudeModelChoices(ModelFields[field], ctx.DataHome)
+			Select: &provider.SelectConfigAction{
+				EmptyMessage: "No models.",
+				LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
+					return LoadClaudeModelChoices(ModelFields[field], ctx.DataHome)
+				},
+				ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
+					if err := saveClaudeModel(ModelFields[field], item.Name, ctx.DataHome); err != nil {
+						return "", err
+					}
+					return "Updated " + name + ": " + item.Name, nil
+				},
 			},
-			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
-				if err := saveClaudeModel(ModelFields[field], item.Name, ctx.DataHome); err != nil {
-					return "", err
-				}
-				return "Updated " + name + ": " + item.Name, nil
-			},
-			EmptyMessage: "No models.",
 		}
 	}
 
 	return []provider.ConfigAction{
 		{
-			Name:         "Model provider",
-			Title:        "Claude Code model providers",
-			EmptyMessage: "No model providers.",
+			Name:  "Model provider",
+			Title: "Claude Code model providers",
 			Columns: func(ctx provider.Context) []provider.ConfigColumn {
 				val := currentClaudeProviderColumn(ctx.DataHome)
 				cols := make([]provider.ConfigColumn, len(val))
@@ -125,37 +126,40 @@ func (p *ClaudeProvider) ConfigurationActions() []provider.ConfigAction {
 				}
 				return cols
 			},
-			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
-				entries, err := loadClaudeModelProviders(ctx.DataHome)
-				if err != nil {
-					return nil, err
-				}
-				items := make([]provider.ConfigItem, len(entries))
-				for i, e := range entries {
-					url := ""
-					if e.Provider != nil {
-						if u, ok := e.Provider["ANTHROPIC_BASE_URL"].(string); ok {
-							url = u
+			Select: &provider.SelectConfigAction{
+				EmptyMessage: "No model providers.",
+				LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
+					entries, err := loadClaudeModelProviders(ctx.DataHome)
+					if err != nil {
+						return nil, err
+					}
+					items := make([]provider.ConfigItem, len(entries))
+					for i, e := range entries {
+						url := ""
+						if e.Provider != nil {
+							if u, ok := e.Provider["ANTHROPIC_BASE_URL"].(string); ok {
+								url = u
+							}
+						}
+						items[i] = provider.ConfigItem{
+							Name:     e.Name,
+							Label:    e.Label,
+							Selected: e.Selected,
+							Columns:  []provider.ConfigColumn{{Name: "url", Value: url}},
 						}
 					}
-					items[i] = provider.ConfigItem{
-						Name:     e.Name,
-						Label:    e.Label,
-						Selected: e.Selected,
-						Columns:  []provider.ConfigColumn{{Name: "url", Value: url}},
+					return items, nil
+				},
+				ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
+					same, err := selectClaudeModelProvider(item.Name, ctx.DataHome)
+					if err != nil {
+						return "", err
 					}
-				}
-				return items, nil
-			},
-			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
-				same, err := selectClaudeModelProvider(item.Name, ctx.DataHome)
-				if err != nil {
-					return "", err
-				}
-				if same {
-					return "Updated model provider env: " + item.Name, nil
-				}
-				return "Selected model provider: " + item.Name, nil
+					if same {
+						return "Updated model provider env: " + item.Name, nil
+					}
+					return "Selected model provider: " + item.Name, nil
+				},
 			},
 		},
 		makeModelAction("Opus model", "Claude Code Opus model", "opus"),

@@ -34,11 +34,11 @@ func TestAllConfigurationActions(t *testing.T) {
 
 	// Test LoadItems for each action.
 	for i, action := range actions {
-		if action.LoadItems == nil {
+		if action.Select == nil || action.Select.LoadItems == nil {
 			t.Errorf("action[%d] %q: missing LoadItems function", i, action.Name)
 			continue
 		}
-		items, err := action.LoadItems(ctx)
+		items, err := action.Select.LoadItems(ctx)
 		if err != nil {
 			t.Logf("  action[%d] %q LoadItems error: %v (may be expected)", i, action.Name, err)
 			continue

@@ -74,20 +74,37 @@ type ConfigColumn struct {
 	Value string `json:"value"`
 }
 
-// ConfigAction defines a configuration section (e.g., model provider selection).
+// ConfigAction defines a configuration action in the Configurations view.
 type ConfigAction struct {
-	Name                 string
-	Title                string
-	Mode                 string // "" or "multiselect"
-	DirectItem           *ConfigItem
-	EmptyMessage         string
-	EmptySubitemsMessage string
-	Columns              func(ctx Context) []ConfigColumn
-	LoadItems            func(ctx Context) ([]ConfigItem, error)
-	LoadSubitems         func(item ConfigItem, ctx Context) ([]ConfigItem, error)
-	ApplyItem            func(item ConfigItem, ctx Context) (string, error)
-	ApplySubitems        func(item ConfigItem, selected []ConfigItem, ctx Context) (string, error)
-	SubitemsTitle        func(item ConfigItem) string
+	Name              string
+	Title             string
+	Columns           func(ctx Context) []ConfigColumn
+	Select            *SelectConfigAction
+	DirectMultiSelect *DirectMultiSelectConfigAction
+}
+
+// SelectConfigAction presents a list of Configuration items. Selecting an item
+// either applies it directly or opens a Multi-select configuration list.
+type SelectConfigAction struct {
+	EmptyMessage string
+	LoadItems    func(ctx Context) ([]ConfigItem, error)
+	ApplyItem    func(item ConfigItem, ctx Context) (string, error)
+	MultiSelect  *SubitemConfigAction
+}
+
+// DirectMultiSelectConfigAction skips the intermediate item list and opens a
+// Multi-select configuration list for a known Configuration item.
+type DirectMultiSelectConfigAction struct {
+	Item     ConfigItem
+	Subitems SubitemConfigAction
+}
+
+// SubitemConfigAction defines the Multi-select configuration list behavior.
+type SubitemConfigAction struct {
+	EmptyMessage string
+	Title        func(item ConfigItem) string
+	LoadItems    func(item ConfigItem, ctx Context) ([]ConfigItem, error)
+	Apply        func(item ConfigItem, selected []ConfigItem, ctx Context) (string, error)
 }
 
 // Context carries provider-specific runtime context (cwd, dataHome, etc).

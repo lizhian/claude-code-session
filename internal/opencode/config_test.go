@@ -29,11 +29,8 @@ func TestConfigurationActions(t *testing.T) {
 		if !strings.HasPrefix(action.Name, "Provider ") {
 			t.Errorf("provider action[%d]: expected Provider prefix, got %q", i, action.Name)
 		}
-		if action.Mode != "multiselect" {
-			t.Errorf("provider action[%d]: expected multiselect mode, got %q", i, action.Mode)
-		}
-		if action.DirectItem == nil {
-			t.Errorf("provider action[%d]: expected DirectItem", i)
+		if action.DirectMultiSelect == nil {
+			t.Errorf("provider action[%d]: expected direct multi-select workflow", i)
 		}
 	}
 
@@ -47,10 +44,10 @@ func TestConfigurationActions(t *testing.T) {
 	}
 
 	for i, action := range actions {
-		if action.LoadItems == nil {
+		if action.Select == nil || action.Select.LoadItems == nil {
 			continue
 		}
-		items, err := action.LoadItems(ctx)
+		items, err := action.Select.LoadItems(ctx)
 		if err != nil {
 			t.Logf("  action[%d] %q LoadItems error: %v", i, action.Name, err)
 			continue

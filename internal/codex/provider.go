@@ -100,25 +100,27 @@ func (p *CodexProvider) ConfigurationActions() []provider.ConfigAction {
 				name := currentCodexProviderColumn(ctx.DataHome)
 				return []provider.ConfigColumn{{Name: "provider", Value: name}}
 			},
-			EmptyMessage: "No model providers.",
-			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
-				return loadModelProviderItems(ctx.DataHome)
-			},
-			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
-				result, err := selectModelProvider(item.Name, ctx.DataHome)
-				if err != nil {
-					return "", err
-				}
-				if result.sameProvider {
-					return "Updated model provider auth: " + item.Name, nil
-				}
-				if result.synced {
-					return "Selected model provider: " + item.Name + "; synced Codex threads", nil
-				}
-				if result.syncError != "" {
-					return "Selected model provider: " + item.Name + "; codex-threadripper sync failed: " + result.syncError, nil
-				}
-				return "Selected model provider: " + item.Name, nil
+			Select: &provider.SelectConfigAction{
+				EmptyMessage: "No model providers.",
+				LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
+					return loadModelProviderItems(ctx.DataHome)
+				},
+				ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
+					result, err := selectModelProvider(item.Name, ctx.DataHome)
+					if err != nil {
+						return "", err
+					}
+					if result.sameProvider {
+						return "Updated model provider auth: " + item.Name, nil
+					}
+					if result.synced {
+						return "Selected model provider: " + item.Name + "; synced Codex threads", nil
+					}
+					if result.syncError != "" {
+						return "Selected model provider: " + item.Name + "; codex-threadripper sync failed: " + result.syncError, nil
+					}
+					return "Selected model provider: " + item.Name, nil
+				},
 			},
 		},
 	}

@@ -28,8 +28,8 @@ func TestConfigurationActions(t *testing.T) {
 	}
 
 	// Test LoadItems.
-	if modelProviderAction.LoadItems != nil {
-		items, err := modelProviderAction.LoadItems(ctx)
+	if modelProviderAction.Select != nil && modelProviderAction.Select.LoadItems != nil {
+		items, err := modelProviderAction.Select.LoadItems(ctx)
 		if err != nil {
 			t.Logf("LoadItems error (expected if no Claude settings): %v", err)
 		} else {

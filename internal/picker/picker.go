@@ -59,6 +59,7 @@ type Model struct {
 	configSubitems []provider.ConfigItem
 	activeAction   *provider.ConfigAction
 	activeItem     *provider.ConfigItem
+	activeSubitems *provider.SubitemConfigAction
 	configStatus   string
 
 	// Preview state.
@@ -266,6 +267,7 @@ func (m Model) handleEscape() (tea.Model, tea.Cmd) {
 		m.view = ViewConfigurations
 		m.activeAction = nil
 		m.activeItem = nil
+		m.activeSubitems = nil
 		m.configItems = nil
 		m.configSubitems = nil
 		return m, nil
@@ -421,6 +423,7 @@ func (m Model) handleLeft() (tea.Model, tea.Cmd) {
 		m.view = ViewConfigurations
 		m.activeAction = nil
 		m.activeItem = nil
+		m.activeSubitems = nil
 		m.configItems = nil
 		m.configSubitems = nil
 		return m, nil
@@ -432,8 +435,9 @@ func (m Model) handleLeft() (tea.Model, tea.Cmd) {
 
 func (m Model) cancelConfigurationSubitems() (tea.Model, tea.Cmd) {
 	m.activeItem = nil
+	m.activeSubitems = nil
 	m.configSubitems = nil
-	if m.activeAction != nil && m.activeAction.DirectItem != nil {
+	if m.activeAction != nil && m.activeAction.DirectMultiSelect != nil {
 		m.view = ViewConfigurations
 		m.activeAction = nil
 		return m, nil
@@ -556,11 +560,12 @@ func (m Model) selectConfiguration() (tea.Model, tea.Cmd) {
 	m.configItemSelectedIndex = 0
 
 	// Direct multiselect actions skip the intermediate item list.
-	if action.Mode == "multiselect" && action.DirectItem != nil && action.LoadSubitems != nil {
-		item := *action.DirectItem
+	if action.DirectMultiSelect != nil {
+		item := action.DirectMultiSelect.Item
 		m.activeItem = &item
+		m.activeSubitems = &action.DirectMultiSelect.Subitems
 		ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
-		subitems, err := action.LoadSubitems(item, ctx)
+		subitems, err := action.DirectMultiSelect.Subitems.LoadItems(item, ctx)
 		if err != nil {
 			m.configSubitems = nil
 			m.configStatus = err.Error()
@@ -568,7 +573,7 @@ func (m Model) selectConfiguration() (tea.Model, tea.Cmd) {
 		}
 		if len(subitems) == 0 {
 			m.configSubitems = nil
-			m.configStatus = action.EmptySubitemsMessage
+			m.configStatus = action.DirectMultiSelect.Subitems.EmptyMessage
 			if m.configStatus == "" {
 				m.configStatus = "No models."
 			}
@@ -580,9 +585,9 @@ func (m Model) selectConfiguration() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if action.LoadItems != nil {
+	if action.Select != nil && action.Select.LoadItems != nil {
 		ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
-		items, err := action.LoadItems(ctx)
+		items, err := action.Select.LoadItems(ctx)
 		if err != nil {
 			m.configItems = nil
 			m.configStatus = err.Error()
@@ -606,7 +611,7 @@ func selectedConfigItemIndex(items []provider.ConfigItem) int {
 }
 
 func (m Model) selectConfigurationItem() (tea.Model, tea.Cmd) {
-	if m.activeAction == nil {
+	if m.activeAction == nil || m.activeAction.Select == nil {
 		return m, nil
 	}
 	idx := render.ClampSelectedIndex(m.configItemSelectedIndex, len(m.configItems))
@@ -616,11 +621,12 @@ func (m Model) selectConfigurationItem() (tea.Model, tea.Cmd) {
 	item := m.configItems[idx]
 
 	// Handle multiselect subitems.
-	if m.activeAction.Mode == "multiselect" && m.activeAction.LoadSubitems != nil {
+	if m.activeAction.Select.MultiSelect != nil {
 		m.activeItem = &item
+		m.activeSubitems = m.activeAction.Select.MultiSelect
 		m.configItemSelectedIndex = 0
 		ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
-		subitems, err := m.activeAction.LoadSubitems(item, ctx)
+		subitems, err := m.activeAction.Select.MultiSelect.LoadItems(item, ctx)
 		if err != nil {
 			m.configSubitems = nil
 			m.configStatus = err.Error()
@@ -628,7 +634,7 @@ func (m Model) selectConfigurationItem() (tea.Model, tea.Cmd) {
 		}
 		if len(subitems) == 0 {
 			m.configSubitems = nil
-			m.configStatus = m.activeAction.EmptySubitemsMessage
+			m.configStatus = m.activeAction.Select.MultiSelect.EmptyMessage
 			if m.configStatus == "" {
 				m.configStatus = "No models."
 			}
@@ -641,9 +647,9 @@ func (m Model) selectConfigurationItem() (tea.Model, tea.Cmd) {
 	}
 
 	// Apply item.
-	if m.activeAction.ApplyItem != nil {
+	if m.activeAction.Select.ApplyItem != nil {
 		ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
-		status, err := m.activeAction.ApplyItem(item, ctx)
+		status, err := m.activeAction.Select.ApplyItem(item, ctx)
 		if err != nil {
 			m.configStatus = err.Error()
 		} else {
@@ -652,6 +658,7 @@ func (m Model) selectConfigurationItem() (tea.Model, tea.Cmd) {
 		m.view = ViewConfigurations
 		m.activeAction = nil
 		m.activeItem = nil
+		m.activeSubitems = nil
 		m.configItems = nil
 		m.configSubitems = nil
 	}
@@ -659,7 +666,7 @@ func (m Model) selectConfigurationItem() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) selectConfigurationSubitems() (tea.Model, tea.Cmd) {
-	if m.activeAction == nil || m.activeAction.ApplySubitems == nil {
+	if m.activeAction == nil || m.activeItem == nil || m.activeSubitems == nil || m.activeSubitems.Apply == nil {
 		return m, nil
 	}
 	var selected []provider.ConfigItem
@@ -669,7 +676,7 @@ func (m Model) selectConfigurationSubitems() (tea.Model, tea.Cmd) {
 		}
 	}
 	ctx := provider.Context{Cwd: m.cwd, DataHome: m.provider.DefaultHome()}
-	status, err := m.activeAction.ApplySubitems(*m.activeItem, selected, ctx)
+	status, err := m.activeSubitems.Apply(*m.activeItem, selected, ctx)
 	if err != nil {
 		m.configStatus = err.Error()
 	} else {
@@ -679,6 +686,7 @@ func (m Model) selectConfigurationSubitems() (tea.Model, tea.Cmd) {
 	m.view = ViewConfigurations
 	m.activeAction = nil
 	m.activeItem = nil
+	m.activeSubitems = nil
 	m.configItems = nil
 	m.configSubitems = nil
 	m.configSelectedIndex = render.ClampSelectedIndex(m.configSelectedIndex, len(m.configActions))
@@ -1203,8 +1211,8 @@ func (m Model) renderConfigurationItems() string {
 
 	if len(m.configItems) == 0 {
 		emptyMsg := "No configurations."
-		if m.activeAction != nil && m.activeAction.EmptyMessage != "" {
-			emptyMsg = m.activeAction.EmptyMessage
+		if m.activeAction != nil && m.activeAction.Select != nil && m.activeAction.Select.EmptyMessage != "" {
+			emptyMsg = m.activeAction.Select.EmptyMessage
 		}
 		lines = append(lines, emptyMsg)
 		return strings.Join(lines, "\n")
@@ -1275,8 +1283,8 @@ func (m Model) renderConfigurationItems() string {
 
 func (m Model) renderConfigurationSubitems() string {
 	title := "Configurations"
-	if m.activeAction != nil && m.activeAction.SubitemsTitle != nil && m.activeItem != nil {
-		title = m.activeAction.SubitemsTitle(*m.activeItem)
+	if m.activeSubitems != nil && m.activeSubitems.Title != nil && m.activeItem != nil {
+		title = m.activeSubitems.Title(*m.activeItem)
 	}
 
 	lines := []string{
@@ -1290,8 +1298,8 @@ func (m Model) renderConfigurationSubitems() string {
 
 	if len(m.configSubitems) == 0 {
 		emptyMsg := "No configurations."
-		if m.activeAction != nil && m.activeAction.EmptySubitemsMessage != "" {
-			emptyMsg = m.activeAction.EmptySubitemsMessage
+		if m.activeSubitems != nil && m.activeSubitems.EmptyMessage != "" {
+			emptyMsg = m.activeSubitems.EmptyMessage
 		}
 		lines = append(lines, emptyMsg)
 		return strings.Join(lines, "\n")

@@ -100,16 +100,18 @@ func (p *OpenCodeProvider) ConfigurationActions() []provider.ConfigAction {
 			Columns: func(ctx provider.Context) []provider.ConfigColumn {
 				return []provider.ConfigColumn{{Value: loadConfiguredModelValue("model")}}
 			},
-			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
-				return loadConfiguredModelChoices("model")
+			Select: &provider.SelectConfigAction{
+				EmptyMessage: "No configured models.",
+				LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
+					return loadConfiguredModelChoices("model")
+				},
+				ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
+					if err := saveConfiguredModel("model", item.Name); err != nil {
+						return "", err
+					}
+					return "Updated default model: " + item.Name, nil
+				},
 			},
-			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
-				if err := saveConfiguredModel("model", item.Name); err != nil {
-					return "", err
-				}
-				return "Updated default model: " + item.Name, nil
-			},
-			EmptyMessage: "No configured models.",
 		},
 		provider.ConfigAction{
 			Name:  "Small model",
@@ -117,16 +119,18 @@ func (p *OpenCodeProvider) ConfigurationActions() []provider.ConfigAction {
 			Columns: func(ctx provider.Context) []provider.ConfigColumn {
 				return []provider.ConfigColumn{{Value: loadConfiguredModelValue("small_model")}}
 			},
-			LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
-				return loadConfiguredModelChoices("small_model")
+			Select: &provider.SelectConfigAction{
+				EmptyMessage: "No configured models.",
+				LoadItems: func(ctx provider.Context) ([]provider.ConfigItem, error) {
+					return loadConfiguredModelChoices("small_model")
+				},
+				ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
+					if err := saveConfiguredModel("small_model", item.Name); err != nil {
+						return "", err
+					}
+					return "Updated small model: " + item.Name, nil
+				},
 			},
-			ApplyItem: func(item provider.ConfigItem, ctx provider.Context) (string, error) {
-				if err := saveConfiguredModel("small_model", item.Name); err != nil {
-					return "", err
-				}
-				return "Updated small model: " + item.Name, nil
-			},
-			EmptyMessage: "No configured models.",
 		},
 	)
 	return actions
@@ -151,29 +155,32 @@ func openCodeProviderModelActions() []provider.ConfigAction {
 			title += "  " + npm
 		}
 		actions = append(actions, provider.ConfigAction{
-			Name:                 "Provider " + item.Name,
-			Title:                title,
-			Mode:                 "multiselect",
-			DirectItem:           &item,
-			EmptySubitemsMessage: "No models.",
+			Name:  "Provider " + item.Name,
+			Title: title,
 			Columns: func(ctx provider.Context) []provider.ConfigColumn {
 				return columns
 			},
-			LoadSubitems: func(item provider.ConfigItem, ctx provider.Context) ([]provider.ConfigItem, error) {
-				return loadProviderModels(item.Name)
-			},
-			SubitemsTitle: func(item provider.ConfigItem) string {
-				return title
-			},
-			ApplySubitems: func(item provider.ConfigItem, selected []provider.ConfigItem, ctx provider.Context) (string, error) {
-				names := make([]string, len(selected))
-				for i, s := range selected {
-					names[i] = s.Name
-				}
-				if err := saveProviderModels(item.Name, names); err != nil {
-					return "", err
-				}
-				return fmt.Sprintf("Updated models for %s: %d selected", item.Name, len(names)), nil
+			DirectMultiSelect: &provider.DirectMultiSelectConfigAction{
+				Item: item,
+				Subitems: provider.SubitemConfigAction{
+					EmptyMessage: "No models.",
+					Title: func(item provider.ConfigItem) string {
+						return title
+					},
+					LoadItems: func(item provider.ConfigItem, ctx provider.Context) ([]provider.ConfigItem, error) {
+						return loadProviderModels(item.Name)
+					},
+					Apply: func(item provider.ConfigItem, selected []provider.ConfigItem, ctx provider.Context) (string, error) {
+						names := make([]string, len(selected))
+						for i, s := range selected {
+							names[i] = s.Name
+						}
+						if err := saveProviderModels(item.Name, names); err != nil {
+							return "", err
+						}
+						return fmt.Sprintf("Updated models for %s: %d selected", item.Name, len(names)), nil
+					},
+				},
 			},
 		})
 	}
