@@ -38,9 +38,10 @@ $ChecksumUrl = if ($Version -eq "latest") {
 $HasClaude = [bool](Get-Command claude -ErrorAction SilentlyContinue)
 $HasCodex = [bool](Get-Command codex -ErrorAction SilentlyContinue)
 $HasOpenCode = [bool](Get-Command opencode -ErrorAction SilentlyContinue)
+$HasPi = [bool](Get-Command pi -ErrorAction SilentlyContinue)
 
 if (-not $HasClaude) {
-  Write-Warning "claude was not found in PATH. Skipping cc function."
+  Write-Warning "claude was not found in PATH. Skipping c function."
 }
 if (-not $HasCodex) {
   Write-Warning "codex was not found in PATH. Skipping cx function."
@@ -48,9 +49,12 @@ if (-not $HasCodex) {
 if (-not $HasOpenCode) {
   Write-Warning "opencode was not found in PATH. Skipping oc function."
 }
+if (-not $HasPi) {
+  Write-Warning "pi was not found in PATH. Skipping p function."
+}
 
-if (-not ($HasClaude -or $HasCodex -or $HasOpenCode)) {
-  Fail "No supported agent CLI found in PATH. Install claude, codex, or opencode first."
+if (-not ($HasClaude -or $HasCodex -or $HasOpenCode -or $HasPi)) {
+  Fail "No supported agent CLI found in PATH. Install claude, codex, opencode, or pi first."
 }
 
 # --- Download ---
@@ -87,19 +91,24 @@ try {
 }
 
 # --- Create symlinks (hardlinks on Windows) ---
-$CcPath = Join-Path $InstallDir "cc.exe"
+$CPath = Join-Path $InstallDir "c.exe"
+$LegacyCcPath = Join-Path $InstallDir "cc.exe"
 $CxPath = Join-Path $InstallDir "cx.exe"
 $OcPath = Join-Path $InstallDir "oc.exe"
+$PPath = Join-Path $InstallDir "p.exe"
 
 # Remove old links if they exist.
-Remove-Item -Path $CcPath -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $CPath -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $LegacyCcPath -Force -ErrorAction SilentlyContinue
 Remove-Item -Path $CxPath -Force -ErrorAction SilentlyContinue
 Remove-Item -Path $OcPath -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $PPath -Force -ErrorAction SilentlyContinue
 
 # Create hardlinks (no admin rights needed on same volume).
-New-Item -ItemType HardLink -Path $CcPath -Target $BinaryPath -Force | Out-Null
+New-Item -ItemType HardLink -Path $CPath -Target $BinaryPath -Force | Out-Null
 New-Item -ItemType HardLink -Path $CxPath -Target $BinaryPath -Force | Out-Null
 New-Item -ItemType HardLink -Path $OcPath -Target $BinaryPath -Force | Out-Null
+New-Item -ItemType HardLink -Path $PPath -Target $BinaryPath -Force | Out-Null
 
 # --- Add to PATH in PowerShell profile ---
 $ProfilePath = $PROFILE.CurrentUserAllHosts
@@ -135,9 +144,10 @@ $PathBlock = @"
 # agent-session BEGIN
 `$env:PATH = "$EscapedInstallDir;`$env:PATH"
 
-function cc { & "$EscapedInstallDir\agent-session.exe" cc @args }
+function c { & "$EscapedInstallDir\agent-session.exe" c @args }
 function cx { & "$EscapedInstallDir\agent-session.exe" cx @args }
 function oc { & "$EscapedInstallDir\agent-session.exe" oc @args }
+function p { & "$EscapedInstallDir\agent-session.exe" p @args }
 # agent-session END
 "@
 
@@ -145,9 +155,10 @@ $UpdatedProfile += "`n$PathBlock`n"
 Set-Content -Path $ProfilePath -Value $UpdatedProfile -Encoding UTF8
 
 $AvailableAliases = @()
-if ($HasClaude)  { $AvailableAliases += "cc" }
+if ($HasClaude)  { $AvailableAliases += "c" }
 if ($HasCodex)   { $AvailableAliases += "cx" }
 if ($HasOpenCode) { $AvailableAliases += "oc" }
+if ($HasPi) { $AvailableAliases += "p" }
 
 Write-Host ""
 Write-Host "Done! Restart PowerShell or run: . `$PROFILE"

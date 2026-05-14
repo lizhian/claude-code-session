@@ -1,6 +1,6 @@
 # Agent Session
 
-Agent Session is a Go CLI for finding, filtering, configuring, and reopening local sessions created by Claude Code, Codex, and OpenCode.
+Agent Session is a Go CLI for finding, filtering, configuring, and reopening local sessions created by Claude Code, Codex, OpenCode, and Pi Coding Agent.
 
 ## Language
 
@@ -31,6 +31,10 @@ _Avoid_: Provider code
 **Session**:
 A local conversation record created by an **Agent provider** for a project directory.
 _Avoid_: Chat, transcript file
+
+**Session directory**:
+A provider-native storage directory where one **Agent provider** reads and writes **Sessions**.
+_Avoid_: Config directory, home directory
 
 **Workspace**:
 A project directory that has one or more **Sessions** for an **Agent provider**.
@@ -98,13 +102,17 @@ _Avoid_: Permission mode
 
 ## Relationships
 
-- A **Public command** names exactly one **Agent provider**: `cc` names Claude Code, `cx` names Codex, and `oc` names OpenCode.
-- The **Dispatcher binary** may be invoked as `cc`, `cx`, or `oc`, or as `agent-session cc`, `agent-session cx`, or `agent-session oc`.
+- A **Public command** names exactly one **Agent provider**: `c` names Claude Code, `cx` names Codex, `oc` names OpenCode, and `p` names Pi Coding Agent.
+- The **Dispatcher binary** may be invoked as `c`, `cx`, `oc`, or `p`, or as `agent-session c`, `agent-session cx`, `agent-session oc`, or `agent-session p`.
+- `cc` remains a legacy compatibility entrypoint for Claude Code, but it is not the canonical **Public command**.
 - A **Provider implementation** belongs to exactly one **Agent provider**.
 - Every **Provider implementation** implements the **Provider interface**.
-- **Provider implementations** own provider-specific session discovery because Claude Code, Codex, and OpenCode store **Sessions** differently.
+- **Provider implementations** own provider-specific session discovery because Claude Code, Codex, OpenCode, and Pi Coding Agent store **Sessions** differently.
 - **Common support modules** must not own provider-specific storage rules.
 - A **Workspace** contains zero or more currently matching **Sessions** for one **Agent provider**.
+- Pi Coding Agent has a **Session directory** that can be set independently from its configuration directory.
+- Pi Coding Agent launches use the selected **Session directory** so reopening a **Session** resolves against the same storage used by discovery.
+- Pi Coding Agent launches use the selected configuration directory through `PI_CODING_AGENT_DIR`.
 - A **Session picker** starts in the session list and can navigate to **Workspaces**, the **Configurations view**, and **Session preview**.
 - A **Session preview** loads a **Conversation transcript** lazily for the selected **Session**.
 - A **Conversation transcript** includes useful user and assistant messages, not tool calls or internal records.
@@ -113,6 +121,7 @@ _Avoid_: Permission mode
 - A **Configuration action** may show direct **Configuration items** or a **Multi-select configuration list**.
 - Claude Code and Codex expose **Model provider** selection as a **Configuration action**.
 - OpenCode exposes `@ai-sdk/*` provider model lists, default model, and small model as **Configuration actions**.
+- Pi Coding Agent exposes no **Configuration actions** in Agent Session until its configuration workflow is intentionally added.
 - **Model provider selection state** is authoritative before fallback native model-provider fields when an **Agent provider** supports both.
 - Codex **Model provider selection state** uses top-level `model_provider_selected`, falling back to native `model_provider` only when no selected provider is recorded.
 - Claude Code **Model provider selection state** uses `model_provider_selected`; the selected provider's fields are copied into `env`.
@@ -128,6 +137,7 @@ _Avoid_: Permission mode
 - OpenCode **Permission mode selection state** uses native `permission`, and legacy `permission_mode_selected` is migrated away.
 - Claude Code and Codex support default, auto, and full **Permission modes**.
 - OpenCode supports default and full **Permission modes** only.
+- Pi Coding Agent supports only the default **Permission mode**; its tool-selection flags are not **Permission modes**.
 - Claude Code and Codex update **Trust state** before launching; OpenCode has no Agent Session-managed **Trust state**.
 
 ## Example dialogue
@@ -165,11 +175,17 @@ _Avoid_: Permission mode
 > **Dev:** "Should OpenCode store Agent Session's last permission choice in `permission_mode_selected`?"
 > **Domain expert:** "No. OpenCode **Permission mode selection state** uses native `permission`; legacy `permission_mode_selected` is migrated away."
 
+> **Dev:** "Can Pi Coding Agent's `--tools` flags be treated as Agent Session **Permission modes**?"
+> **Domain expert:** "No. Pi Coding Agent currently has only the default **Permission mode** in Agent Session; tool allowlists are a different concept."
+
+> **Dev:** "Should Pi Coding Agent's native `pi config` workflow appear in Agent Session's **Configurations view**?"
+> **Domain expert:** "No. Pi Coding Agent has no Agent Session **Configuration actions** until that workflow is designed separately."
+
 ## Flagged ambiguities
 
 - "provider" is resolved as **Model provider** when it refers to a selectable backend inside an **Agent provider**.
-- "agent" is resolved as **Agent provider** when it refers to Claude Code, Codex, or OpenCode.
-- "CLI" is resolved as **Dispatcher binary** when discussing `agent-session` itself, and **Public command** when discussing `cc`, `cx`, or `oc`.
+- "agent" is resolved as **Agent provider** when it refers to Claude Code, Codex, OpenCode, or Pi Coding Agent.
+- "CLI" is resolved as **Dispatcher binary** when discussing `agent-session` itself, and **Public command** when discussing `c`, `cx`, `oc`, or `p`.
 - "Provider CLI" is a retired term from the old multi-script layout; use **Provider implementation** for provider-specific Go packages.
 - "alias" is resolved as **Public command** unless the discussion is specifically about shell function installation.
 - "settings" is resolved as **Configurations view** when discussing the picker screen.
