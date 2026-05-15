@@ -3,5 +3,5 @@ node_modules/
 *.log
 coverage/
 .idea/
-agent-session
+/agent-session
 dist/

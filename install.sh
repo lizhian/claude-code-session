@@ -54,11 +54,12 @@ CHECKSUM_URL="$(dirname "$RELEASE_URL")/checksums.txt"
 has_claude=false
 has_codex=false
 has_opencode=false
+has_pi=false
 
 if command -v claude >/dev/null 2>&1; then
   has_claude=true
 else
-  printf 'Warning: claude was not found in PATH. Skipping cc alias.\n' >&2
+  printf 'Warning: claude was not found in PATH. Skipping c function.\n' >&2
 fi
 
 if command -v codex >/dev/null 2>&1; then
@@ -73,8 +74,14 @@ else
   printf 'Warning: opencode was not found in PATH. Skipping oc alias.\n' >&2
 fi
 
-if [[ "$has_claude" != true && "$has_codex" != true && "$has_opencode" != true ]]; then
-  fail "No supported agent CLI found in PATH. Install claude, codex, or opencode first."
+if command -v pi >/dev/null 2>&1; then
+  has_pi=true
+else
+  printf 'Warning: pi was not found in PATH. Skipping p alias.\n' >&2
+fi
+
+if [[ "$has_claude" != true && "$has_codex" != true && "$has_opencode" != true && "$has_pi" != true ]]; then
+  fail "No supported agent CLI found in PATH. Install claude, codex, opencode, or pi first."
 fi
 
 # --- Download ---
@@ -110,9 +117,11 @@ mv -f "$TMP_BINARY" "$BINARY_PATH"
 info "Installed agent-session to $BINARY_PATH"
 
 # --- Create symlinks for direct binary use ---
-ln -sf "$BINARY_PATH" "$INSTALL_DIR/cc"
+rm -f "$INSTALL_DIR/cc"
+ln -sf "$BINARY_PATH" "$INSTALL_DIR/c"
 ln -sf "$BINARY_PATH" "$INSTALL_DIR/cx"
 ln -sf "$BINARY_PATH" "$INSTALL_DIR/oc"
+ln -sf "$BINARY_PATH" "$INSTALL_DIR/p"
 
 # --- Add shell functions so workspace selection can cd the parent shell ---
 if [[ -n "${SHELL:-}" && "$(basename "$SHELL")" == "bash" ]]; then
@@ -163,9 +172,10 @@ _agent_session_run() {
   rm -f "\$cwd_file"
   return \$exit_status
 }
-cc() { _agent_session_run cc "\$@"; }
+c() { _agent_session_run c "\$@"; }
 cx() { _agent_session_run cx "\$@"; }
 oc() { _agent_session_run oc "\$@"; }
+p() { _agent_session_run p "\$@"; }
 $end_marker
 EOF
 info "Added agent-session shell functions to $shell_rc"
@@ -184,7 +194,7 @@ mv "$js_tmp" "$shell_rc"
 
 available_aliases=""
 if [[ "$has_claude" == true ]]; then
-  available_aliases="cc"
+  available_aliases="c"
 fi
 if [[ "$has_codex" == true ]]; then
   if [[ -n "$available_aliases" ]]; then
@@ -197,6 +207,12 @@ if [[ "$has_opencode" == true ]]; then
     available_aliases+=", "
   fi
   available_aliases+="oc"
+fi
+if [[ "$has_pi" == true ]]; then
+  if [[ -n "$available_aliases" ]]; then
+    available_aliases+=", "
+  fi
+  available_aliases+="p"
 fi
 
 info ""

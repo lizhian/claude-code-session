@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains a Go CLI (`agent-session`) for browsing Claude Code, Codex, and OpenCode sessions. A single dispatcher binary selects an agent provider either from the invoked command name (`cc`, `cx`, `oc`) or from the first subcommand (`agent-session cc`, `agent-session cx`, `agent-session oc`). Use the domain terms in `CONTEXT.md` when describing these concepts.
+This repository contains a Go CLI (`agent-session`) for browsing Claude Code, Codex, and OpenCode sessions. A single dispatcher binary selects an agent provider either from the invoked command name (`c`, `cx`, `oc`) or from the first subcommand (`agent-session c`, `agent-session cx`, `agent-session oc`). Use the domain terms in `CONTEXT.md` when describing these concepts.
 
 - `cmd/agent-session/main.go`: Dispatcher binary entry point. Resolves the public command and launches the matching provider implementation.
 - `internal/provider/provider.go`: Provider interface and shared provider-facing data types.
@@ -18,7 +18,7 @@ This repository contains a Go CLI (`agent-session`) for browsing Claude Code, Co
 - `README.md`: User-facing documentation in Chinese.
 - `go.mod` / `go.sum`: Go module definition and dependency checksums.
 
-Keep the provider implementations additive: changes for `cx` or `oc` should not regress the existing `cc` behavior.
+Keep the provider implementations additive: changes for `cx` or `oc` should not regress the existing `c` behavior.
 Do not document or reintroduce unsupported public flags such as `--json`, `--pick`, or `--trust-current-folder` unless the dispatcher and provider argument parsers are implemented first.
 
 ## Build, Test, and Development Commands
@@ -26,13 +26,13 @@ Do not document or reintroduce unsupported public flags such as `--json`, `--pic
 - `go test ./...`: runs all tests.
 - `go vet ./...`: static analysis.
 - `go build -ldflags="-s -w" -o agent-session ./cmd/agent-session/`: builds a stripped binary (~10MB).
-- `./agent-session cc`: opens the interactive Claude picker.
+- `./agent-session c`: opens the interactive Claude picker.
 - `./agent-session cx`: opens the Codex picker.
 - `./agent-session oc`: opens the OpenCode picker.
-- `./agent-session cc --cwd <path>`: opens the Claude picker for a specific directory.
+- `./agent-session c --cwd <path>`: opens the Claude picker for a specific directory.
 - `./agent-session cx --cwd <path>`: opens the Codex picker for a specific directory.
 - `./agent-session oc --cwd <path>`: opens the OpenCode picker for a specific directory.
-- `./agent-session cc --help`, `./agent-session cx --help`, `./agent-session oc --help`: show provider-specific supported options.
+- `./agent-session c --help`, `./agent-session cx --help`, `./agent-session oc --help`: show provider-specific supported options.
 
 ## Coding Style & Naming Conventions
 
