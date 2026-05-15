@@ -3,6 +3,7 @@ package codex
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -96,8 +97,64 @@ auth_json = "{\"OPENAI_API_KEY\":\"target-key\"}"
 	if !ok {
 		t.Fatal("old provider missing")
 	}
-	if oldProvider["auth_json"] != currentAuth {
-		t.Fatalf("old auth_json = %q, want %q", oldProvider["auth_json"], currentAuth)
+	wantCurrentAuth := `{
+  "OPENAI_API_KEY": "current-key"
+}`
+	if oldProvider["auth_json"] != wantCurrentAuth {
+		t.Fatalf("old auth_json = %q, want %q", oldProvider["auth_json"], wantCurrentAuth)
+	}
+	wantAuthBlock := `auth_json = '''
+{
+  "OPENAI_API_KEY": "current-key"
+}
+'''`
+	if !strings.Contains(string(updatedConfig), wantAuthBlock) {
+		t.Fatalf("updated config missing multiline auth_json block:\nwant contains:\n%s\n\ngot:\n%s", wantAuthBlock, string(updatedConfig))
+	}
+
+	auth, err := os.ReadFile(filepath.Join(codexHome, "auth.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(auth) != targetAuth {
+		t.Fatalf("auth.json = %q, want %q", string(auth), targetAuth)
+	}
+}
+
+func TestSelectModelProviderReadsMultilineAuthJSON(t *testing.T) {
+	codexHome := t.TempDir()
+	configPath := filepath.Join(codexHome, "config.toml")
+	currentAuth := `{"OPENAI_API_KEY":"current-key"}`
+	targetAuth := `{
+  "OPENAI_API_KEY": "target-key"
+}`
+	config := `model = "gpt-5.1"
+model_provider = "old"
+model_provider_selected = "old"
+
+[model_providers.old]
+name = "old"
+base_url = "https://old.example.com/v1"
+auth_json = "{\"OPENAI_API_KEY\":\"old-key\"}"
+
+[model_providers.new]
+name = "new"
+base_url = "https://new.example.com/v1"
+auth_json = '''
+{
+  "OPENAI_API_KEY": "target-key"
+}
+'''
+`
+	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(codexHome, "auth.json"), []byte(currentAuth), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := selectModelProvider("new", codexHome); err != nil {
+		t.Fatal(err)
 	}
 
 	auth, err := os.ReadFile(filepath.Join(codexHome, "auth.json"))

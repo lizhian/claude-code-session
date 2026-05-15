@@ -1,6 +1,8 @@
 package codex
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,6 +30,40 @@ func parseTomlString(value string) string {
 		}
 	}
 	return trimmed
+}
+
+func parseTomlMultilineString(lines []string, start int, value string) (string, int, bool) {
+	trimmed := strings.TrimSpace(value)
+	quote := ""
+	switch {
+	case strings.HasPrefix(trimmed, "'''"):
+		quote = "'''"
+	case strings.HasPrefix(trimmed, `"""`):
+		quote = `"""`
+	default:
+		return "", start, false
+	}
+
+	first := strings.TrimPrefix(trimmed, quote)
+	if end := strings.Index(first, quote); end >= 0 {
+		return first[:end], start, true
+	}
+
+	content := []string{}
+	if first != "" {
+		content = append(content, first)
+	}
+	for i := start + 1; i < len(lines); i++ {
+		line := lines[i]
+		if end := strings.Index(line, quote); end >= 0 {
+			if line[:end] != "" {
+				content = append(content, line[:end])
+			}
+			return strings.Join(content, "\n"), i, true
+		}
+		content = append(content, line)
+	}
+	return "", start, false
 }
 
 var tableRe = regexp.MustCompile(`^\s*\[(.+)]\s*$`)
@@ -103,8 +139,9 @@ func parseTomlProviders(text string) (providers []struct {
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
 
-		// Skip multiline strings for simplicity — we just need provider names.
-		if strings.Contains(value, "'''") || strings.Contains(value, "\"\"\"") {
+		if parsed, end, ok := parseTomlMultilineString(lines, i, value); ok {
+			current.Config[key] = parsed
+			i = end
 			continue
 		}
 		current.Config[key] = parseTomlString(value)
@@ -197,11 +234,11 @@ func setModelProviderStringField(text, providerName, fieldName, value string) st
 		return text
 	}
 
-	replacement := fmt.Sprintf("%s = %s", fieldName, strconv.Quote(value))
+	replacement := fmt.Sprintf("%s = %s", fieldName, formatModelProviderStringValue(fieldName, value))
 	pattern := regexp.MustCompile(`^\s*` + regexp.QuoteMeta(fieldName) + `\s*=`)
 	for i := tableIdx + 1; i < tableEnd; i++ {
 		if pattern.MatchString(lines[i]) {
-			lines[i] = replacement
+			lines = replaceTomlField(lines, i, tableEnd, replacement)
 			return strings.Join(lines, "\n")
 		}
 	}
@@ -211,6 +248,44 @@ func setModelProviderStringField(text, providerName, fieldName, value string) st
 	result = append(result, replacement)
 	result = append(result, lines[tableIdx+1:]...)
 	return strings.Join(result, "\n")
+}
+
+func replaceTomlField(lines []string, fieldIdx, tableEnd int, replacement string) []string {
+	end := fieldIdx + 1
+	parts := strings.SplitN(lines[fieldIdx], "=", 2)
+	if len(parts) == 2 {
+		if _, parsedEnd, ok := parseTomlMultilineString(lines, fieldIdx, parts[1]); ok && parsedEnd < tableEnd {
+			end = parsedEnd + 1
+		}
+	}
+
+	result := make([]string, 0, len(lines)-end+fieldIdx+1)
+	result = append(result, lines[:fieldIdx]...)
+	result = append(result, strings.Split(replacement, "\n")...)
+	result = append(result, lines[end:]...)
+	return result
+}
+
+func formatModelProviderStringValue(fieldName, value string) string {
+	if fieldName == "auth_json" {
+		return formatTomlMultilineLiteral(formatCodexAuthJSON(value))
+	}
+	return strconv.Quote(value)
+}
+
+func formatCodexAuthJSON(value string) string {
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, []byte(value), "", "  "); err == nil {
+		return pretty.String()
+	}
+	return strings.TrimSpace(value)
+}
+
+func formatTomlMultilineLiteral(value string) string {
+	if strings.Contains(value, "'''") {
+		return strconv.Quote(value)
+	}
+	return "'''\n" + value + "\n'''"
 }
 
 func findModelProviderConfig(providers []struct {
