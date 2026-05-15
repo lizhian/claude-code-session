@@ -237,11 +237,24 @@ func selectModelProvider(providerName, codexHome string) (syncStatus, error) {
 		return syncStatus{}, fmt.Errorf("missing config file: %s", configPath)
 	}
 	text := string(data)
-	_, _, currentSelected := parseTomlProviders(text)
+	providers, _, currentSelected := parseTomlProviders(text)
 	sameProvider := currentSelected == providerName
+	if _, ok := findModelProviderConfig(providers, providerName); !ok {
+		return syncStatus{}, fmt.Errorf("unknown model provider: %s", providerName)
+	}
 
-	updated := setTopLevelStringField(text, "model_provider_selected", providerName)
+	updated, err := backupCurrentCodexAuth(text, currentSelected, codexHome)
+	if err != nil {
+		return syncStatus{}, err
+	}
+	providers, _, _ = parseTomlProviders(updated)
+	targetConfig, _ := findModelProviderConfig(providers, providerName)
+	updated = setTopLevelStringField(updated, "model_provider", providerName)
+	updated = setTopLevelStringField(updated, "model_provider_selected", providerName)
 	if err := writeConfigText(configPath, updated); err != nil {
+		return syncStatus{}, err
+	}
+	if err := writeCodexAuth(targetConfig["auth_json"], codexHome); err != nil {
 		return syncStatus{}, err
 	}
 
@@ -255,4 +268,33 @@ func selectModelProvider(providerName, codexHome string) (syncStatus, error) {
 	}
 
 	return status, nil
+}
+
+func codexAuthPath(codexHome string) string {
+	return filepath.Join(codexHome, "auth.json")
+}
+
+func backupCurrentCodexAuth(configText, providerName, codexHome string) (string, error) {
+	if providerName == "" {
+		return configText, nil
+	}
+	auth, err := os.ReadFile(codexAuthPath(codexHome))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return configText, nil
+		}
+		return "", err
+	}
+	return setModelProviderStringField(configText, providerName, "auth_json", string(auth)), nil
+}
+
+func writeCodexAuth(authJSON, codexHome string) error {
+	if authJSON == "" {
+		return nil
+	}
+	authPath := codexAuthPath(codexHome)
+	if err := os.MkdirAll(filepath.Dir(authPath), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(authPath, []byte(authJSON), 0o600)
 }

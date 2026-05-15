@@ -1,6 +1,8 @@
 package codex
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -45,6 +47,66 @@ func TestSelectModelProviderSyncStatus(t *testing.T) {
 			t.Error("expected synced=true")
 		}
 	})
+}
+
+func TestSelectModelProviderUpdatesNativeSelectionAndAuth(t *testing.T) {
+	codexHome := t.TempDir()
+	configPath := filepath.Join(codexHome, "config.toml")
+	currentAuth := `{"OPENAI_API_KEY":"current-key"}`
+	targetAuth := `{"OPENAI_API_KEY":"target-key"}`
+	config := `model = "gpt-5.1"
+model_provider = "old"
+model_provider_selected = "old"
+
+[model_providers.old]
+name = "old"
+base_url = "https://old.example.com/v1"
+auth_json = "{\"OPENAI_API_KEY\":\"stale-old-key\"}"
+
+[model_providers.new]
+name = "new"
+base_url = "https://new.example.com/v1"
+auth_json = "{\"OPENAI_API_KEY\":\"target-key\"}"
+`
+	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(codexHome, "auth.json"), []byte(currentAuth), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := selectModelProvider("new", codexHome); err != nil {
+		t.Fatal(err)
+	}
+
+	updatedConfig, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, modelProvider, selectedProvider := parseTomlProviders(string(updatedConfig))
+	if modelProvider != "new" {
+		t.Fatalf("model_provider = %q, want new", modelProvider)
+	}
+	if selectedProvider != "new" {
+		t.Fatalf("model_provider_selected = %q, want new", selectedProvider)
+	}
+
+	providers, _, _ := parseTomlProviders(string(updatedConfig))
+	oldProvider, ok := findModelProviderConfig(providers, "old")
+	if !ok {
+		t.Fatal("old provider missing")
+	}
+	if oldProvider["auth_json"] != currentAuth {
+		t.Fatalf("old auth_json = %q, want %q", oldProvider["auth_json"], currentAuth)
+	}
+
+	auth, err := os.ReadFile(filepath.Join(codexHome, "auth.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(auth) != targetAuth {
+		t.Fatalf("auth.json = %q, want %q", string(auth), targetAuth)
+	}
 }
 
 func TestHelperFunctions(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -18,11 +19,13 @@ func codexConfigPath(codexHome string) string {
 // parseTomlString parses a basic or literal TOML string.
 func parseTomlString(value string) string {
 	trimmed := strings.TrimSpace(value)
-	if strings.HasPrefix(trimmed, "\"") && strings.HasSuffix(trimmed, "\"") {
-		return strings.Trim(trimmed, "\"")
-	}
-	if strings.HasPrefix(trimmed, "'") && strings.HasSuffix(trimmed, "'") {
-		return trimmed[1 : len(trimmed)-1]
+	if len(trimmed) >= 2 {
+		if unquoted, err := strconv.Unquote(trimmed); err == nil {
+			return unquoted
+		}
+		if strings.HasPrefix(trimmed, "'") && strings.HasSuffix(trimmed, "'") {
+			return trimmed[1 : len(trimmed)-1]
+		}
 	}
 	return trimmed
 }
@@ -172,6 +175,54 @@ func setTopLevelStringField(text, fieldName, value string) string {
 	result = append(result, replacement)
 	result = append(result, lines[insertIdx:]...)
 	return strings.Join(result, "\n")
+}
+
+func setModelProviderStringField(text, providerName, fieldName, value string) string {
+	lines := strings.Split(text, "\n")
+	tableIdx := -1
+	tableEnd := len(lines)
+	for i, line := range lines {
+		if parseTableName(line) == providerName {
+			tableIdx = i
+			for j := i + 1; j < len(lines); j++ {
+				if strings.HasPrefix(strings.TrimSpace(lines[j]), "[") {
+					tableEnd = j
+					break
+				}
+			}
+			break
+		}
+	}
+	if tableIdx == -1 {
+		return text
+	}
+
+	replacement := fmt.Sprintf("%s = %s", fieldName, strconv.Quote(value))
+	pattern := regexp.MustCompile(`^\s*` + regexp.QuoteMeta(fieldName) + `\s*=`)
+	for i := tableIdx + 1; i < tableEnd; i++ {
+		if pattern.MatchString(lines[i]) {
+			lines[i] = replacement
+			return strings.Join(lines, "\n")
+		}
+	}
+
+	result := make([]string, 0, len(lines)+1)
+	result = append(result, lines[:tableIdx+1]...)
+	result = append(result, replacement)
+	result = append(result, lines[tableIdx+1:]...)
+	return strings.Join(result, "\n")
+}
+
+func findModelProviderConfig(providers []struct {
+	Name   string
+	Config map[string]string
+}, providerName string) (map[string]string, bool) {
+	for _, p := range providers {
+		if p.Name == providerName {
+			return p.Config, true
+		}
+	}
+	return nil, false
 }
 
 func writeConfigText(configPath, text string) error {
