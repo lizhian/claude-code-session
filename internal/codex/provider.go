@@ -110,7 +110,7 @@ func (p *CodexProvider) ConfigurationActions() []provider.ConfigAction {
 					if err != nil {
 						return "", err
 					}
-					if result.sameProvider {
+					if result.sameProvider && result.authUpdated {
 						return "Updated model provider auth: " + item.Name, nil
 					}
 					if result.synced {
@@ -224,6 +224,7 @@ func loadModelProviderItems(codexHome string) ([]provider.ConfigItem, error) {
 // syncStatus is returned by selectModelProvider when a thread sync was attempted.
 type syncStatus struct {
 	sameProvider bool
+	authUpdated  bool
 	synced       bool
 	syncError    string
 }
@@ -243,22 +244,28 @@ func selectModelProvider(providerName, codexHome string) (syncStatus, error) {
 		return syncStatus{}, fmt.Errorf("unknown model provider: %s", providerName)
 	}
 
-	updated, err := backupCurrentCodexAuth(text, currentSelected, codexHome)
+	updated, authBackedUp, err := backupCurrentCodexAuth(text, currentSelected, codexHome)
 	if err != nil {
 		return syncStatus{}, err
 	}
 	providers, _, _ = parseTomlProviders(updated)
 	targetConfig, _ := findModelProviderConfig(providers, providerName)
+	targetAuthJSON, targetManagesAuth := targetConfig["auth_json"]
 	updated = setTopLevelStringField(updated, "model_provider", providerName)
 	updated = setTopLevelStringField(updated, "model_provider_selected", providerName)
 	if err := writeConfigText(configPath, updated); err != nil {
 		return syncStatus{}, err
 	}
-	if err := writeCodexAuth(targetConfig["auth_json"], codexHome); err != nil {
-		return syncStatus{}, err
+	authRestored := false
+	if targetManagesAuth {
+		var err error
+		authRestored, err = writeCodexAuth(targetAuthJSON, codexHome)
+		if err != nil {
+			return syncStatus{}, err
+		}
 	}
 
-	status := syncStatus{sameProvider: sameProvider}
+	status := syncStatus{sameProvider: sameProvider, authUpdated: authBackedUp || authRestored}
 
 	// If switched to a different provider, try to sync threads.
 	if !sameProvider {
@@ -274,27 +281,38 @@ func codexAuthPath(codexHome string) string {
 	return filepath.Join(codexHome, "auth.json")
 }
 
-func backupCurrentCodexAuth(configText, providerName, codexHome string) (string, error) {
+func backupCurrentCodexAuth(configText, providerName, codexHome string) (string, bool, error) {
 	if providerName == "" {
-		return configText, nil
+		return configText, false, nil
+	}
+	providers, _, _ := parseTomlProviders(configText)
+	providerConfig, ok := findModelProviderConfig(providers, providerName)
+	if !ok {
+		return configText, false, nil
+	}
+	if _, managesAuth := providerConfig["auth_json"]; !managesAuth {
+		return configText, false, nil
 	}
 	auth, err := os.ReadFile(codexAuthPath(codexHome))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return configText, nil
+			return configText, false, nil
 		}
-		return "", err
+		return "", false, err
 	}
-	return setModelProviderStringField(configText, providerName, "auth_json", string(auth)), nil
+	return setModelProviderStringField(configText, providerName, "auth_json", string(auth)), true, nil
 }
 
-func writeCodexAuth(authJSON, codexHome string) error {
+func writeCodexAuth(authJSON, codexHome string) (bool, error) {
 	if authJSON == "" {
-		return nil
+		return false, nil
 	}
 	authPath := codexAuthPath(codexHome)
 	if err := os.MkdirAll(filepath.Dir(authPath), 0o755); err != nil {
-		return err
+		return false, err
 	}
-	return os.WriteFile(authPath, []byte(authJSON), 0o600)
+	if err := os.WriteFile(authPath, []byte(authJSON), 0o600); err != nil {
+		return false, err
+	}
+	return true, nil
 }

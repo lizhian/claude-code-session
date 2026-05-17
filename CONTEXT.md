@@ -131,7 +131,7 @@ _Avoid_: Permission mode
 - Claude Code **Model provider** model choices are discovered from the selected provider's `GET /v1/models` endpoint.
 - Claude Code model discovery uses the selected **Model provider**'s own `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`, not fallback `env` values.
 - Claude Code Haiku, Opus, and Sonnet model settings use the same discovered model list without automatic name-based filtering.
-- Codex **Model provider** switching backs up current `auth.json` into the previously selected provider before writing the target provider's auth.
+- Codex **Model provider** switching only manages `auth.json` for providers that explicitly declare `auth_json`: the previous provider is backed up only if it already has `auth_json`, and the target provider writes `auth.json` only if it has `auth_json`.
 - Codex **Model provider** switching may attempt thread sync through `codex-threadripper`; missing `codex-threadripper` means sync is skipped, not failed.
 - OpenCode can read JSONC-style config but writes standard formatted JSON.
 - OpenCode **Permission mode selection state** uses native `permission`, and legacy `permission_mode_selected` is migrated away.
@@ -166,8 +166,8 @@ _Avoid_: Permission mode
 > **Dev:** "If a third-party Claude model ID does not contain Haiku, Opus, or Sonnet, should the picker hide it?"
 > **Domain expert:** "No. Claude Code Haiku, Opus, and Sonnet actions share the discovered model list because third-party **Model providers** often use aliases."
 
-> **Dev:** "When switching Codex **Model providers**, can we replace `auth.json` immediately?"
-> **Domain expert:** "No. First back up the current `auth.json` into the previously selected provider, then write the target provider's auth."
+> **Dev:** "When switching Codex **Model providers**, should every provider update `auth.json`?"
+> **Domain expert:** "No. Only providers that explicitly declare `auth_json` participate in Agent Session-managed `auth.json` backup and restore."
 
 > **Dev:** "If `codex-threadripper` is not installed, did Codex provider switching fail?"
 > **Domain expert:** "No. Missing `codex-threadripper` means thread sync is skipped after the **Model provider** switch."
